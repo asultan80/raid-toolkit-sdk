@@ -30,47 +30,45 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
 
       - name: Set branch-based environment variables
-        uses: iamtheyammer/branch-env-vars@v1.0.4
-        with:
-          PRERELEASE: |
-            main:true
-            !default:false
-          PRERELEASEN: |
-            main:1
-            !default:0
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_name }}" -eq "main") {
+            echo "PRERELEASE=true" >> $env:GITHUB_ENV
+            echo "PRERELEASEN=1" >> $env:GITHUB_ENV
+          } else {
+            echo "PRERELEASE=false" >> $env:GITHUB_ENV
+            echo "PRERELEASEN=0" >> $env:GITHUB_ENV
+          }
 
-      # Install the .NET Core workload
       - name: Install .NET Core
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
             5.0.x
             6.0.x
 
-      # Add  MSBuild to the PATH: https://github.com/microsoft/setup-msbuild
       - name: Setup MSBuild.exe
-        uses: microsoft/setup-msbuild@v1.0.2
+        uses: microsoft/setup-msbuild@v2
 
-      # Versions
-      - uses: dotnet/nbgv@master
+      - name: Set version with nbgv
+        uses: dotnet/nbgv@master
         id: rtk_version
         with:
           setAllVars: true
 
-      - uses: actions/cache@v1
+      - uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      # Restore the application to populate the obj folder with RuntimeIdentifiers
       - name: Restore the application
         run: msbuild $env:Solution_Name /t:Restore /p:Configuration=Release
 
@@ -94,7 +92,7 @@ jobs:
           BuildOutputDirectory: ..\Application\Raid.Toolkit\bin\x64\Release\net6.0-windows10.0.19041.0\win10-x64
 
       - name: Create release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.rtk_version.outputs.Version }}
           prerelease: ${{ env.PRERELEASE }}
@@ -105,4 +103,3 @@ jobs:
             src/Setup/out/RaidToolkitSetup.exe
             src/Template/vsix/bin/release/RTKExtensionTemplate.vsix
             ThirdPartyNotice.txt
-
