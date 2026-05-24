@@ -21,13 +21,65 @@ Use this skill when working on the Raid Toolkit SDK source code.
 | `src/Shared/Common/GitHub/` | Auto-update logic |
 | `src/Setup/` | WiX installer → `RaidToolkitSetup.exe` |
 
-## Build
+## Build (Windows only)
 
 ```
 msbuild SDK.sln -t:"Build;Pack" -p:Configuration=Release -p:Platform=x64
 ```
 
-CI: `.github/workflows/app-publish.yml` triggers on push to `release/**` or `main` when source paths change. Creates a GitHub Release with `RaidToolkitSetup.exe` automatically.
+## CI / Releasing
+
+**No manual tags needed.** Version auto-calculated by Nerdbank.GitVersioning (`version.json` major.minor + commit count).
+
+To trigger a release: push any source change to `release/**` or `main`. Doc-only commits (`*.md`) are excluded from the trigger.
+
+To force a release with no other changes: bump `version.json`.
+
+CI workflow: `.github/workflows/app-publish.yml`
+- Builds on `windows-latest`
+- Produces `RaidToolkitSetup.exe` (WiX installer) + `Raid.Toolkit.exe`
+- Creates a GitHub Release automatically
+- NuGet/npm/PyPI publish steps removed (no secrets configured in this fork)
+
+### Key CI fixes in this fork (do not revert)
+
+| What | Why |
+|---|---|
+| Removed `mickem/clean-after-action@v1` | Repo deleted upstream — caused "Set up job" failure |
+| Replaced `iamtheyammer/branch-env-vars@v1.0.4` | Personal repo action gone — now inline PowerShell |
+| All actions bumped to current versions | v1/v2 deprecated and removed by GitHub |
+| Added `permissions: contents: write` | Required for release creation — missing = 403 |
+| Added `fail_on_unmatched_files: false` | VSIX not always present — without this, release step errors |
+
+## Installing the release on Windows
+
+Prerequisites:
+- Windows 10 build 19041+ or Windows 11
+- .NET 6 Desktop Runtime: `winget install Microsoft.DotNet.DesktopRuntime.6`
+- Windows App SDK 1.4: `winget install Microsoft.WindowsAppRuntime.1.4`
+- Plarium Play + RAID installed
+
+Steps:
+1. Download `RaidToolkitSetup.exe` from [releases](https://github.com/asultan80/raid-toolkit-sdk/releases/latest)
+2. Right-click → **Run as administrator**
+3. SmartScreen prompt → **More info → Run anyway** (build is unsigned)
+4. Launch RAID via Plarium Play, wait for lobby
+5. RTK tray icon should appear
+
+## Diagnosing launch failures — read logs first
+
+```powershell
+# RTK log
+Get-ChildItem "$env:LOCALAPPDATA\RaidToolkit\Logs" | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | Get-Content | Select-Object -Last 50
+
+# Windows crash events
+Get-WinEvent -LogName Application -MaxEvents 50 | Where-Object { $_.LevelDisplayName -eq "Error" } | Select-Object -First 5 | Format-List
+
+# Check prerequisites
+Get-AppxPackage -Name "Microsoft.WindowsAppRuntime*" | Select-Object Name, Version
+dotnet --list-runtimes | Select-String "Microsoft.WindowsDesktop"
+Get-ItemProperty "Registry::HKEY_USERS\.DEFAULT\SOFTWARE\PlariumPlayInstaller" -ErrorAction SilentlyContinue
+```
 
 ## WebSocket API (`ws://localhost:9090`)
 

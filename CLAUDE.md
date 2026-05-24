@@ -35,9 +35,87 @@ This document covers architecture, build instructions, the account-dump JSON sch
 msbuild SDK.sln -t:"Build;Pack" -p:Configuration=Release -p:Platform=x64
 ```
 
-Or just download `RaidToolkitSetup.exe` from [GitHub Releases](https://github.com/raid-toolkit/raid-toolkit-sdk/releases) — that is the easiest path for end users.
-
 `buildext.bat` — brute-force clean + rebuild for extension development.
+
+## CI / Release Process
+
+Releases are built automatically by GitHub Actions on every push to `main` or `release/**` that touches source paths. **No manual tagging needed** — the version is calculated by Nerdbank.GitVersioning from `version.json` + commit count.
+
+### Workflow file
+
+`.github/workflows/app-publish.yml` — triggers on push to `main` or `release/**` when any of these paths change:
+`version.json`, `Directory.Build.props`, `src/Application/**`, `src/Extensions/**`, `src/Shared/**`, `src/Setup/**`, `src/ClientSDK/DotNet/**`, `.github/workflows/app-publish.yml`
+
+`*.md` files are **excluded** — doc-only commits do not trigger a build.
+
+### To trigger a release
+
+Make any meaningful change to source and push to `release/v2.9` (or whatever the current release branch is). If you only have doc changes and need to force a release, touch `version.json` (e.g. bump the patch).
+
+### Release assets produced
+
+| File | What it is |
+|---|---|
+| `RaidToolkitSetup.exe` | WiX burn bundle installer — what end users install |
+| `Raid.Toolkit.exe` | Standalone launcher exe |
+| `RTKExtensionTemplate.vsix` | VS extension template (dev only) |
+| `ThirdPartyNotice.txt` | OSS attribution |
+| `UPGRADE_2.0.md` | Migration notes |
+
+### Version scheme
+
+`version.json` sets the major.minor (e.g. `"version": "2.9"`). The full tag is `v{major}.{minor}.{commitHeight}.{buildNumber}` — e.g. `v2.9.0.10716`. Bump `version.json` when you want a clean minor version boundary.
+
+### Known CI fixes applied to this fork (do not revert)
+
+These were broken in the upstream workflow and fixed here:
+
+| Fix | Reason |
+|---|---|
+| Removed `mickem/clean-after-action@v1` | Action repo was deleted; caused "Set up job" failure |
+| Replaced `iamtheyammer/branch-env-vars@v1.0.4` with inline PowerShell | Personal repo action, gone; replaced with `echo "VAR=val" >> $env:GITHUB_ENV` |
+| Updated all actions to current versions (`checkout@v4`, `setup-dotnet@v4`, `cache@v4`, `setup-msbuild@v2`, `action-gh-release@v2`) | v1/v2 versions deprecated and removed |
+| Added `permissions: contents: write` to the job | Required for `softprops/action-gh-release` to create releases; missing caused release step to fail with 403 |
+| Added `fail_on_unmatched_files: false` to release step | VSIX not always built; without this the release step errors on missing file |
+| Removed NuGet/npm/PyPI publish steps | No registry secrets configured in this fork; steps would always fail |
+
+### Installing the release on Windows
+
+Prerequisites (check before installing):
+1. Windows 10 build 19041+ or Windows 11
+2. .NET 6 Desktop Runtime (x64) — `winget install Microsoft.DotNet.DesktopRuntime.6`
+3. Windows App SDK 1.4 runtime — `winget install Microsoft.WindowsAppRuntime.1.4`
+4. Plarium Play installed with RAID: Shadow Legends
+
+Install steps:
+1. Download `RaidToolkitSetup.exe` from the [latest release](https://github.com/asultan80/raid-toolkit-sdk/releases/latest)
+2. Right-click → **Run as administrator** (required for registry writes)
+3. If Windows SmartScreen appears: click **More info → Run anyway** (build is unsigned)
+4. Launch RAID via Plarium Play, wait for lobby
+5. RTK tray icon appears — click → **Accounts** to verify it attached
+
+### Diagnosing launch failures
+
+If RTK installs but fails to launch:
+
+```powershell
+# 1. Check RTK's own log
+Get-Content "$env:LOCALAPPDATA\RaidToolkit\Logs\$(Get-ChildItem "$env:LOCALAPPDATA\RaidToolkit\Logs" | Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty Name)" | Select-Object -Last 50
+
+# 2. Check Windows Event Log for crash
+Get-WinEvent -LogName Application -MaxEvents 50 | Where-Object { $_.LevelDisplayName -eq "Error" } | Select-Object -First 5 | Format-List
+
+# 3. Verify Windows App SDK installed
+Get-AppxPackage -Name "Microsoft.WindowsAppRuntime*" | Select-Object Name, Version
+
+# 4. Verify .NET 6 Desktop Runtime
+dotnet --list-runtimes | Select-String "Microsoft.WindowsDesktop"
+
+# 5. Verify Plarium Play registry key exists (RTK needs this to find the game)
+Get-ItemProperty "Registry::HKEY_USERS\.DEFAULT\SOFTWARE\PlariumPlayInstaller" -ErrorAction SilentlyContinue
+```
+
+Always read the logs first before installing anything.
 
 ## WebSocket API
 
