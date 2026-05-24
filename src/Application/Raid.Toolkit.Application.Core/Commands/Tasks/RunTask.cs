@@ -25,11 +25,19 @@ namespace Raid.Toolkit.Application.Core.Commands.Tasks
             Options = options;
         }
 
-        private static Task<int> ActivateCurrentProcess()
+        private static async Task<int?> TryActivateCurrentProcess()
         {
-            RaidToolkitClientBase client = new();
-            client.Connect();
-            return client.MakeApi<ActivationApi>().Activate(new Uri("rtk://default"), Array.Empty<string>());
+            try
+            {
+                RaidToolkitClientBase client = new();
+                client.Connect();
+                return await client.MakeApi<ActivationApi>().Activate(new Uri("rtk://default"), Array.Empty<string>());
+            }
+            catch
+            {
+                // No instance is actually listening — stale singleton handle; fall through to start normally
+                return null;
+            }
         }
 
         public async Task<int> Invoke()
@@ -45,7 +53,10 @@ namespace Raid.Toolkit.Application.Core.Commands.Tasks
                     // already running?
                     if (!SingletonProcess.TryAcquireSingleton())
                     {
-                        return await ActivateCurrentProcess();
+                        int? result = await TryActivateCurrentProcess();
+                        if (result.HasValue)
+                            return result.Value;
+                        // stale singleton — continue starting up
                     }
                 }
             }
