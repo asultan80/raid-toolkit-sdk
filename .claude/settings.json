@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(dotnet *)",
+      "Bash(msbuild *)",
+      "Bash(grep *)",
+      "Bash(find *)",
+      "Read(**)"
+    ]
+  }
+}
