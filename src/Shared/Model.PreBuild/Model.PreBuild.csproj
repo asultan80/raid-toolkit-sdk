@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
@@ -9,12 +9,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="il2cpptoolkit.reversecompiler" Version="2.1.1-alpha" />
-        <PackageReference Include="il2cpptoolkit.target.netcore" Version="2.1.1-alpha" />
+        <ProjectReference Include="..\..\il2cpptoolkit\Il2CppToolkit.ReverseCompiler\Il2CppToolkit.ReverseCompiler.csproj" />
+        <ProjectReference Include="..\..\il2cpptoolkit\Il2CppToolkit.Target.NetCore\Il2CppToolkit.Target.NetCore.csproj" />
         <ProjectReference Include="..\Model\Model.csproj" />
     </ItemGroup>
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-        <Exec Command="$(TargetDir)$(TargetName).exe $(BinDir)$(TargetFrameworkVersion)\" />
+        <Exec Command="$(TargetDir)$(TargetName).exe $(BinDir)$(TargetFrameworkVersion)\" ContinueOnError="WarnAndContinue" />
     </Target>
 </Project>

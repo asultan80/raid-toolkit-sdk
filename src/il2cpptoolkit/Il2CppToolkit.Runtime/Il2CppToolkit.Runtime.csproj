@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Il2CppToolkit.Runtime</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>11.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Il2CppToolkit.Common\Il2CppToolkit.Common.csproj" />
+    <PackageReference Include="Il2CppToolkit.Injection.Client" Version="2.1.1-alpha" />
+    <PackageReference Include="ProcessMemoryUtilities.Net" Version="1.3.4" />
+    <PackageReference Include="System.Memory" Version="4.5.5" />
+    <PackageReference Include="Vestris.ResourceLib" Version="2.1.0" />
+  </ItemGroup>
+</Project>

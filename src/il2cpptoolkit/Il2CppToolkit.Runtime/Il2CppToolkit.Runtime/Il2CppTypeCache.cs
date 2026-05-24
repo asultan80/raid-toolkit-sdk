@@ -1,0 +1,74 @@
+using System;
+using System.Collections.Concurrent;
+using System.Reflection;
+using System.Threading;
+using Grpc.Core;
+using Il2CppToolkit.Injection.Client;
+using Il2CppToolkit.Runtime.Types.Reflection;
+
+namespace Il2CppToolkit.Runtime;
+
+public class Il2CppTypeCache
+{
+	private readonly ConcurrentDictionary<ulong, Il2CppTypeInfo> TypeInfoByAddr = new ConcurrentDictionary<ulong, Il2CppTypeInfo>();
+
+	private readonly ConcurrentDictionary<Type, Il2CppTypeInfo> TypeInfoByType = new ConcurrentDictionary<Type, Il2CppTypeInfo>();
+
+	public static bool HasType(Il2CsRuntimeContext runtime, Type managedType)
+	{
+		Il2CppTypeInfo value;
+		return runtime.TypeCache.TypeInfoByType.TryGetValue(managedType, out value);
+	}
+
+	public static bool TryGetOrLoadTypeInfoCore(Il2CsRuntimeContext runtime, Type managedType, ulong classAddr, out Il2CppTypeInfo result)
+	{
+		Il2CppTypeCache typeCache = runtime.TypeCache;
+		if (managedType == null)
+		{
+			throw new ArgumentNullException("managedType");
+		}
+		result = typeCache.TypeInfoByType.GetOrAdd(managedType, (Func<Type, Il2CppTypeInfo>)((Type managedType) => (classAddr == 0) ? runtime.InjectionClient.Il2Cpp.GetTypeInfo(new GetTypeInfoRequest
+		{
+			Klass = Il2CppTypeName.GetKlass(managedType)
+		}, (Metadata)null, (DateTime?)null, default(CancellationToken)).TypeInfo : runtime.InjectionClient.Il2Cpp.GetTypeInfo(new GetTypeInfoRequest
+		{
+			Address = classAddr
+		}, (Metadata)null, (DateTime?)null, default(CancellationToken)).TypeInfo));
+		if (result == null)
+		{
+			return false;
+		}
+		return typeCache.TypeInfoByAddr.TryAdd(result.KlassId.Address, result);
+	}
+
+	public static Il2CppTypeInfo GetTypeInfo(Il2CsRuntimeContext runtime, Type managedType, ulong classAddr = 0uL)
+	{
+		if (managedType == null)
+		{
+			throw new ArgumentNullException("managedType");
+		}
+		if (!TryGetOrLoadTypeInfoCore(runtime, managedType, classAddr, out var result) || result == null)
+		{
+			return result;
+		}
+		if (managedType.IsValueType)
+		{
+			return result;
+		}
+		Type type = managedType;
+		ClassDefinition classDefinition = null;
+		if (classAddr != 0)
+		{
+			classDefinition = new ClassDefinition(runtime, classAddr);
+		}
+		while ((type = type.BaseType) != null && type.GetCustomAttribute<GeneratedAttribute>() != null)
+		{
+			classDefinition = classDefinition?.Base;
+			if (!TryGetOrLoadTypeInfoCore(runtime, type, classDefinition?.Address ?? 0, out var _))
+			{
+				break;
+			}
+		}
+		return result;
+	}
+}

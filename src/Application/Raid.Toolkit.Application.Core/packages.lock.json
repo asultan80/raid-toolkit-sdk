@@ -641,14 +641,14 @@
       "Raid.Model": {
         "type": "Project",
         "dependencies": {
+          "Il2CppToolkit.Common": "[1.0.0, )",
+          "Il2CppToolkit.Metadata": "[1.0.0, )",
+          "Il2CppToolkit.ReverseCompiler": "[1.0.0, )",
+          "Il2CppToolkit.Runtime": "[1.0.0, )",
+          "Il2CppToolkit.Target.NetCore": "[1.0.0, )",
           "Microsoft.Win32.Registry": "[5.0.0, )",
           "Newtonsoft.Json": "[13.0.3, )",
-          "Raid.Common": "[1.0.0, )",
-          "il2cpptoolkit.common": "[2.1.1-alpha, )",
-          "il2cpptoolkit.metadata": "[2.1.1-alpha, )",
-          "il2cpptoolkit.reversecompiler": "[2.1.1-alpha, )",
-          "il2cpptoolkit.runtime": "[2.1.1-alpha, )",
-          "il2cpptoolkit.target.netcore": "[2.1.1-alpha, )"
+          "Raid.Common": "[1.0.0, )"
         }
       },
       "Raid.Toolkit.DataModel": {
