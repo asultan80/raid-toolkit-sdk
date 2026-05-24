@@ -188,8 +188,9 @@ namespace Raid.Toolkit.Model
 
         private void BuildAssembly(PlariumPlayAdapter.GameInfo gameInfo, string dllPath)
         {
-            string metadataPath = Path.Combine(gameInfo.InstallPath, gameInfo.Version, @"Raid_Data\il2cpp_data\Metadata\global-metadata.dat");
-            string gasmPath = Path.Combine(gameInfo.InstallPath, gameInfo.Version, @"GameAssembly.dll");
+            string gameDir = Path.Combine(gameInfo.InstallPath, "build");
+            string metadataPath = Path.Combine(gameDir, @"Raid_Data\il2cpp_data\Metadata\global-metadata.dat");
+            string gasmPath = Path.Combine(gameDir, @"GameAssembly.dll");
 
             _ = Directory.CreateDirectory(Path.GetDirectoryName(dllPath));
 
