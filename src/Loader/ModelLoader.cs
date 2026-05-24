@@ -186,8 +186,9 @@ public class ModelLoader : IModelLoader
 
 	private void BuildAssembly(PlariumPlayAdapter.GameInfo gameInfo, string dllPath)
 	{
-		string metadataPath = Path.Combine(gameInfo.InstallPath!, gameInfo.Version!, @"Raid_Data\il2cpp_data\Metadata\global-metadata.dat");
-		string gasmPath = Path.Combine(gameInfo.InstallPath!, gameInfo.Version!, @"GameAssembly.dll");
+		string gameDir = Path.Combine(gameInfo.InstallPath!, "build");
+		string metadataPath = Path.Combine(gameDir, @"Raid_Data\il2cpp_data\Metadata\global-metadata.dat");
+		string gasmPath = Path.Combine(gameDir, @"GameAssembly.dll");
 		string? dllDir = Path.GetDirectoryName(dllPath);
 		if (!string.IsNullOrEmpty(dllDir))
 			Directory.CreateDirectory(dllDir);
