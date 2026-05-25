@@ -7,6 +7,7 @@
 * Fixed multiple RTK instances launching when a broken/stale instance was already running
 * Fixed model rebuild crash (OverflowException in PE binary scanner) when game binary layout changes
 * Fixed PELoader fallback failing with Win32 error 126 — GameAssembly.dll dependencies now resolved from game directory
+* Fixed "Can't use auto mode" error — corrected IL2CPP code registration pointer offset for metadata version >= 29.1 (v31)
 
 ## 2.8.x
 

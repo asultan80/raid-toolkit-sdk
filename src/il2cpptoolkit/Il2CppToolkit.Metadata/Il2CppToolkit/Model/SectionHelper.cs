@@ -378,6 +378,10 @@ public class SectionHelper
 									il2Cpp.Position = il2Cpp.MapVATR(item4 - il2Cpp.PointerSize);
 									if (il2Cpp.ReadIntPtr() == imageCount)
 									{
+										if (il2Cpp.Version >= 29.1)
+										{
+											return item4 - il2Cpp.PointerSize * 16;
+										}
 										if (il2Cpp.Version >= 29.0)
 										{
 											return item4 - il2Cpp.PointerSize * 14;
