@@ -1,5 +1,13 @@
 # Release Notes
 
+## 2.9.x
+
+* Added support for IL2CPP metadata version 31 (required for current RAID: Shadow Legends game update)
+* Fixed assembly version mismatch on launch caused by il2cpptoolkit DLLs not being included in the installer
+* Fixed multiple RTK instances launching when a broken/stale instance was already running
+* Fixed model rebuild crash (OverflowException in PE binary scanner) when game binary layout changes
+* Fixed PELoader fallback failing with Win32 error 126 — GameAssembly.dll dependencies now resolved from game directory
+
 ## 2.8.x
 
 * Hero equipped artifacts will now update when removed, and will not show as equipped on multiple heroes.
