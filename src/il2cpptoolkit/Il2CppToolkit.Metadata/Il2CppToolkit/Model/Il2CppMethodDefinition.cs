@@ -30,9 +30,6 @@ public class Il2CppMethodDefinition
 	[Version(Max = 24.1)]
 	public int rgctxCount;
 
-	[Version(Min = 31)]
-	public uint returnParameterToken;
-
 	public uint token;
 
 	public ushort flags;
@@ -42,4 +39,7 @@ public class Il2CppMethodDefinition
 	public ushort slot;
 
 	public ushort parameterCount;
+
+	[Version(Min = 31)]
+	public uint returnParameterToken;
 }
