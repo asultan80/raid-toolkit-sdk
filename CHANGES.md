@@ -9,6 +9,7 @@
 * Fixed PELoader fallback failing with Win32 error 126 — GameAssembly.dll dependencies now resolved from game directory
 * Fixed "Can't use auto mode" error — corrected IL2CPP code registration pointer offset for metadata version >= 29.1 (v31)
 * Fixed compiler crash (IndexOutOfRangeException) — Il2CppMethodDefinition.returnParameterToken must be field 4 (between returnType and parameterStart) per metadata v31 binary layout
+* Fixed accounts not loading — AccountManager now catches up with game instances that started before it subscribed to the OnAdded event (race condition on startup)
 
 ## 2.8.x
 

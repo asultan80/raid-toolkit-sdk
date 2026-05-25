@@ -51,6 +51,9 @@ namespace Raid.Toolkit.Extensibility.Host
             GameInstanceManager.OnAdded += GameInstanceManager_OnAdded;
             GameInstanceManager.OnRemoved += GameInstanceManager_OnRemoved;
             InitializeFromStorage();
+            // Catch up with game instances that started before we subscribed to OnAdded
+            foreach (IGameInstance instance in GameInstanceManager.Instances)
+                GameInstanceManager_OnAdded(this, new(instance));
         }
 
         public bool TryGetAccount(string accountId, [NotNullWhen(true)] out AccountInstance? account)
@@ -73,30 +76,37 @@ namespace Raid.Toolkit.Extensibility.Host
 
         private void GameInstanceManager_OnAdded(object? sender, IGameInstanceManager.GameInstancesUpdatedEventArgs e)
         {
-            if (TryGetAccount(e.Instance.Id, out IAccount? value) && value is AccountInstance account)
+            try
             {
-                account.Connect(e.Instance);
-            }
-            else
-            {
-                var appModel = Client.App.SingleInstance<AppModel>._instance.GetValue(e.Instance.Runtime);
-                var userWrapper = appModel._userWrapper;
-                var accountData = userWrapper.Account.AccountData;
-                var gameSettings = userWrapper.UserGameSettings.GameSettings;
-                var socialWrapper = userWrapper.Social.SocialData;
-                var globalId = socialWrapper.PlariumGlobalId;
-                var socialId = socialWrapper.SocialId;
-                Storage.Write(new AccountDataContext(e.Instance.Id), "info.json", new AccountBase
+                if (TryGetAccount(e.Instance.Id, out IAccount? value) && value is AccountInstance account)
                 {
-                    Id = string.Join("_", globalId, socialId).Sha256(),
-                    Avatar = gameSettings.Avatar.ToString(),
-                    AvatarId = ((int)gameSettings.Avatar).ToString(),
-                    Name = gameSettings.Name,
-                    Level = accountData.Level,
-                    Power = (int)Math.Round(accountData.TotalPower, 0)
-                });
-                Storage.Flush();
-                LoadAccount(e.Instance.Id);
+                    account.Connect(e.Instance);
+                }
+                else
+                {
+                    var appModel = Client.App.SingleInstance<AppModel>._instance.GetValue(e.Instance.Runtime);
+                    var userWrapper = appModel._userWrapper;
+                    var accountData = userWrapper.Account.AccountData;
+                    var gameSettings = userWrapper.UserGameSettings.GameSettings;
+                    var socialWrapper = userWrapper.Social.SocialData;
+                    var globalId = socialWrapper.PlariumGlobalId;
+                    var socialId = socialWrapper.SocialId;
+                    Storage.Write(new AccountDataContext(e.Instance.Id), "info.json", new AccountBase
+                    {
+                        Id = string.Join("_", globalId, socialId).Sha256(),
+                        Avatar = gameSettings.Avatar.ToString(),
+                        AvatarId = ((int)gameSettings.Avatar).ToString(),
+                        Name = gameSettings.Name,
+                        Level = accountData.Level,
+                        Power = (int)Math.Round(accountData.TotalPower, 0)
+                    });
+                    Storage.Flush();
+                    LoadAccount(e.Instance.Id);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to add account instance {id}", e.Instance.Id);
             }
         }
 
