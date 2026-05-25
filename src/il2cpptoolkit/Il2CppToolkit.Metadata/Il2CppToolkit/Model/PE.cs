@@ -87,10 +87,17 @@ public sealed class PE : Il2Cpp
 
 	public override bool PlusSearch(int methodCount, int typeDefinitionsCount, int imageCount)
 	{
-		SectionHelper sectionHelper = GetSectionHelper(methodCount, typeDefinitionsCount, imageCount);
-		ulong codeRegistration = sectionHelper.FindCodeRegistration();
-		ulong metadataRegistration = sectionHelper.FindMetadataRegistration();
-		return AutoPlusInit(codeRegistration, metadataRegistration);
+		try
+		{
+			SectionHelper sectionHelper = GetSectionHelper(methodCount, typeDefinitionsCount, imageCount);
+			ulong codeRegistration = sectionHelper.FindCodeRegistration();
+			ulong metadataRegistration = sectionHelper.FindMetadataRegistration();
+			return AutoPlusInit(codeRegistration, metadataRegistration);
+		}
+		catch (Exception)
+		{
+			return false;
+		}
 	}
 
 	public override bool SymbolSearch()

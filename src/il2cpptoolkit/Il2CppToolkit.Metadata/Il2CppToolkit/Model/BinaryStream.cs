@@ -294,6 +294,8 @@ public class BinaryStream : IDisposable
 
 	public T[] ReadClassArray<T>(long count) where T : new()
 	{
+		if (count < 0 || count > 10_000_000)
+			throw new InvalidDataException($"Invalid array count {count} — likely reading garbage offset");
 		T[] array = new T[count];
 		for (int i = 0; i < count; i++)
 		{
