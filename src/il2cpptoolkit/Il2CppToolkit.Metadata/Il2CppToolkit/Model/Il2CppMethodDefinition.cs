@@ -8,6 +8,9 @@ public class Il2CppMethodDefinition
 
 	public int returnType;
 
+	[Version(Min = 31)]
+	public uint returnParameterToken;
+
 	public int parameterStart;
 
 	[Version(Max = 24.0)]
@@ -39,7 +42,4 @@ public class Il2CppMethodDefinition
 	public ushort slot;
 
 	public ushort parameterCount;
-
-	[Version(Min = 31)]
-	public uint returnParameterToken;
 }

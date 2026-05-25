@@ -8,7 +8,7 @@
 * Fixed model rebuild crash (OverflowException in PE binary scanner) when game binary layout changes
 * Fixed PELoader fallback failing with Win32 error 126 — GameAssembly.dll dependencies now resolved from game directory
 * Fixed "Can't use auto mode" error — corrected IL2CPP code registration pointer offset for metadata version >= 29.1 (v31)
-* Fixed compiler crash (IndexOutOfRangeException) — Il2CppMethodDefinition.returnParameterToken was in the wrong struct position for v31
+* Fixed compiler crash (IndexOutOfRangeException) — Il2CppMethodDefinition.returnParameterToken must be field 4 (between returnType and parameterStart) per metadata v31 binary layout
 
 ## 2.8.x
 
