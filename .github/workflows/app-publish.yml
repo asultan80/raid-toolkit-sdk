@@ -15,6 +15,7 @@ on:
       - 'src/Shared/**'
       - 'src/Setup/**'
       - 'src/Template/**'
+      - 'src/il2cpptoolkit/**'
       - '!**/*.md'
 
 jobs:
