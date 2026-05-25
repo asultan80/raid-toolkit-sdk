@@ -13,13 +13,24 @@
         <Platforms>x64</Platforms>
     </PropertyGroup>
 
+    <ItemGroup Condition="'$(TargetFramework)' == 'net6.0-windows'">
+        <ProjectReference Include="..\..\il2cpptoolkit\Il2CppToolkit.Common\Il2CppToolkit.Common.csproj" />
+        <ProjectReference Include="..\..\il2cpptoolkit\Il2CppToolkit.Metadata\Il2CppToolkit.Metadata.csproj" />
+        <ProjectReference Include="..\..\il2cpptoolkit\Il2CppToolkit.ReverseCompiler\Il2CppToolkit.ReverseCompiler.csproj" />
+        <ProjectReference Include="..\..\il2cpptoolkit\Il2CppToolkit.Runtime\Il2CppToolkit.Runtime.csproj" />
+        <ProjectReference Include="..\..\il2cpptoolkit\Il2CppToolkit.Target.NetCore\Il2CppToolkit.Target.NetCore.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+        <PackageReference Include="Il2CppToolkit.Common" Version="2.1.1-alpha" />
+        <PackageReference Include="Il2CppToolkit.Metadata" Version="2.1.1-alpha" />
+        <PackageReference Include="Il2CppToolkit.ReverseCompiler" Version="2.1.1-alpha" />
+        <PackageReference Include="Il2CppToolkit.Runtime" Version="2.1.1-alpha" />
+        <PackageReference Include="Il2CppToolkit.Target.NetCore" Version="2.1.1-alpha" />
+    </ItemGroup>
+
     <ItemGroup>
         <PackageReference Include="Microsoft.Build.Tasks.Core" Version="17.1.0" />
-        <PackageReference Include="il2cpptoolkit.common" Version="2.1.1-alpha" />
-        <PackageReference Include="il2cpptoolkit.metadata" Version="2.1.1-alpha" />
-        <PackageReference Include="il2cpptoolkit.reversecompiler" Version="2.1.1-alpha" />
-        <PackageReference Include="il2cpptoolkit.runtime" Version="2.1.1-alpha" />
-        <PackageReference Include="il2cpptoolkit.target.netcore" Version="2.1.1-alpha" />
         <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
         <PackageReference Include="MSBuildTasks" Version="1.5.0.235">
             <PrivateAssets>all</PrivateAssets>
