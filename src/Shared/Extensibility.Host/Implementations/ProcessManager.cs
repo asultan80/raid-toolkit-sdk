@@ -21,6 +21,7 @@ namespace Raid.Toolkit.Extensibility
         public ProcessManager(IOptions<ProcessManagerSettings> settings, ILogger<ProcessManager> logger)
         {
             Settings = settings;
+            Logger = logger;
         }
 
         public event EventHandler<IProcessManager.ProcessEventArgs> ProcessFound;
@@ -35,16 +36,19 @@ namespace Raid.Toolkit.Extensibility
                 _ = currentIds.Remove(process.Id);
                 if (!ActiveProcesses.ContainsKey(process.Id))
                 {
+                    Logger.LogInformation("ProcessManager: new '{name}' process found, pid={pid}", Settings.Value.ProcessName, process.Id);
                     IProcessManager.ProcessEventArgs args = new(process);
                     try
                     {
                         ProcessFound?.Raise(this, args);
                         if (!args.Retry)
                             ActiveProcesses.Add(process.Id, process);
+                        else
+                            Logger.LogWarning("ProcessManager: pid={pid} not ready, will retry", process.Id);
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogWarning("Error thrown in ProcessFound event handler", ex);
+                        Logger.LogWarning(ex, "ProcessManager: error in ProcessFound handler for pid={pid}", process.Id);
                     }
                 }
             }

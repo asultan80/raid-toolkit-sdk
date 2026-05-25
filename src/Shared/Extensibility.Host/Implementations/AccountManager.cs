@@ -52,8 +52,13 @@ namespace Raid.Toolkit.Extensibility.Host
             GameInstanceManager.OnRemoved += GameInstanceManager_OnRemoved;
             InitializeFromStorage();
             // Catch up with game instances that started before we subscribed to OnAdded
-            foreach (IGameInstance instance in GameInstanceManager.Instances)
+            var existingInstances = GameInstanceManager.Instances;
+            Logger.LogInformation("AccountManager init: found {count} existing game instances", existingInstances.Count);
+            foreach (IGameInstance instance in existingInstances)
+            {
+                Logger.LogInformation("AccountManager init: catching up with instance {id}", instance.Id);
                 GameInstanceManager_OnAdded(this, new(instance));
+            }
         }
 
         public bool TryGetAccount(string accountId, [NotNullWhen(true)] out AccountInstance? account)
@@ -76,14 +81,17 @@ namespace Raid.Toolkit.Extensibility.Host
 
         private void GameInstanceManager_OnAdded(object? sender, IGameInstanceManager.GameInstancesUpdatedEventArgs e)
         {
+            Logger.LogInformation("GameInstanceManager_OnAdded: instance id={id}", e.Instance.Id);
             try
             {
                 if (TryGetAccount(e.Instance.Id, out IAccount? value) && value is AccountInstance account)
                 {
+                    Logger.LogInformation("GameInstanceManager_OnAdded: connecting existing account {id}", e.Instance.Id);
                     account.Connect(e.Instance);
                 }
                 else
                 {
+                    Logger.LogInformation("GameInstanceManager_OnAdded: reading game data for new instance {id}", e.Instance.Id);
                     var appModel = Client.App.SingleInstance<AppModel>._instance.GetValue(e.Instance.Runtime);
                     var userWrapper = appModel._userWrapper;
                     var accountData = userWrapper.Account.AccountData;
@@ -91,6 +99,7 @@ namespace Raid.Toolkit.Extensibility.Host
                     var socialWrapper = userWrapper.Social.SocialData;
                     var globalId = socialWrapper.PlariumGlobalId;
                     var socialId = socialWrapper.SocialId;
+                    Logger.LogInformation("GameInstanceManager_OnAdded: writing storage for {globalId}_{socialId}", globalId, socialId);
                     Storage.Write(new AccountDataContext(e.Instance.Id), "info.json", new AccountBase
                     {
                         Id = string.Join("_", globalId, socialId).Sha256(),
@@ -101,12 +110,13 @@ namespace Raid.Toolkit.Extensibility.Host
                         Power = (int)Math.Round(accountData.TotalPower, 0)
                     });
                     Storage.Flush();
+                    Logger.LogInformation("GameInstanceManager_OnAdded: storage flushed, loading account {id}", e.Instance.Id);
                     LoadAccount(e.Instance.Id);
                 }
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Failed to add account instance {id}", e.Instance.Id);
+                Logger.LogError(ex, "GameInstanceManager_OnAdded failed for instance {id}", e.Instance.Id);
             }
         }
 
