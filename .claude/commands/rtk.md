@@ -27,6 +27,28 @@ Use this skill when working on the Raid Toolkit SDK source code.
 msbuild SDK.sln -t:"Build;Pack" -p:Configuration=Release -p:Platform=x64
 ```
 
+## Checking CI status
+
+Use `WebFetch` on these GitHub HTML pages (not the API — no auth needed):
+
+```
+# All recent runs
+WebFetch: https://github.com/asultan80/raid-toolkit-sdk/actions
+prompt: "List runs — name, status, branch, commit SHA, started how long ago"
+
+# Specific workflow pass/fail
+WebFetch: https://github.com/asultan80/raid-toolkit-sdk/actions/workflows/app-publish.yml
+prompt: "Show run number, final status (success/failure), branch, commit SHA, duration"
+
+# Confirm release published
+WebFetch: https://github.com/asultan80/raid-toolkit-sdk/releases
+prompt: "List top 3 releases — tag, date, asset file names"
+
+# Specific release assets
+WebFetch: https://github.com/asultan80/raid-toolkit-sdk/releases/tag/<version>
+prompt: "List all release assets (file names and sizes)"
+```
+
 ## CI / Releasing
 
 **No manual tags needed.** Version auto-calculated by Nerdbank.GitVersioning (`version.json` major.minor + commit count).
@@ -65,6 +87,49 @@ Steps:
 3. SmartScreen prompt → **More info → Run anyway** (build is unsigned)
 4. Launch RAID via Plarium Play, wait for lobby
 5. RTK tray icon should appear
+
+## Debugging — always start here
+
+### 1. Read the RTK log (most useful)
+
+```powershell
+# List log files, newest first
+Get-ChildItem "$env:LOCALAPPDATA\RaidToolkit\Logs" | Sort-Object LastWriteTime -Descending | Select-Object -First 3
+
+# Read last 80 lines of the latest non-empty log
+$log = Get-ChildItem "$env:LOCALAPPDATA\RaidToolkit\Logs" | Sort-Object LastWriteTime -Descending | Where-Object { $_.Length -gt 0 } | Select-Object -First 1
+Get-Content $log.FullName | Select-Object -Last 80
+```
+
+Log location: `%LOCALAPPDATA%\RaidToolkit\Logs\YYYYMMDD-000.log`
+
+If the log file is **0 bytes**: the app crashed before the logger initialized — go to step 2.
+
+### 2. Check Windows Event Log for crash/hang
+
+```powershell
+Get-WinEvent -LogName Application -MaxEvents 200 |
+  Where-Object { $_.TimeCreated -gt (Get-Date).AddHours(-1) -and
+    ($_.LevelDisplayName -eq "Error" -or $_.Id -in 1000,1002,1026) } |
+  Format-List TimeCreated, Id, LevelDisplayName, Message
+```
+
+### 3. Check installed DLL versions match
+
+```powershell
+Get-ChildItem "$env:LOCALAPPDATA\RaidToolkit\bin" -Filter "Il2CppToolkit*.dll" |
+  ForEach-Object { $v = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($_.FullName); "$($_.Name) — $($v.FileVersion)" }
+# All Il2CppToolkit.*.dll should match Raid.Model.dll version
+[System.Diagnostics.FileVersionInfo]::GetVersionInfo("$env:LOCALAPPDATA\RaidToolkit\bin\Raid.Model.dll").FileVersion
+```
+
+Mismatch = version mismatch bug (old NuGet DLLs in installer). Fix: switch csproj from PackageReference to ProjectReference for il2cpptoolkit projects.
+
+### 4. Check if app is running (not crashed, just silent)
+
+```powershell
+Get-Process | Where-Object { $_.Name -match "Raid|Launcher" } | Select-Object Name, Id, CPU, WorkingSet, StartTime
+```
 
 ## Diagnosing launch failures — read logs first
 
