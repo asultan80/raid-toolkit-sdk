@@ -9,7 +9,9 @@ namespace Il2CppToolkit.Model;
 public class PELoader
 {
 	[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-	private static extern IntPtr LoadLibrary(string path);
+	private static extern IntPtr LoadLibraryEx(string path, IntPtr hFile, uint dwFlags);
+
+	private const uint LOAD_WITH_ALTERED_SEARCH_PATH = 0x00000008;
 
 	public static PE Load(string fileName)
 	{
@@ -38,7 +40,7 @@ public class PELoader
 		SectionHeader[] array = binaryStream.ReadClassArray<SectionHeader>(fileHeader.NumberOfSections);
 		SectionHeader sectionHeader = array[^1];
 		byte[] array2 = new byte[sectionHeader.VirtualAddress + sectionHeader.VirtualSize];
-		IntPtr intPtr = LoadLibrary(fileName);
+		IntPtr intPtr = LoadLibraryEx(fileName, IntPtr.Zero, LOAD_WITH_ALTERED_SEARCH_PATH);
 		if (intPtr == IntPtr.Zero)
 		{
 			throw new Win32Exception(Marshal.GetLastWin32Error());
