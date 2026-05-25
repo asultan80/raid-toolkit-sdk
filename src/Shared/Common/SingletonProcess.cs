@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -45,6 +46,16 @@ namespace Raid.Toolkit.Common
             GlobalHandle = null;
             return false;
 
+        }
+
+        public static void KillStaleInstances()
+        {
+            int currentPid = Process.GetCurrentProcess().Id;
+            string processName = Process.GetCurrentProcess().ProcessName;
+            foreach (var proc in Process.GetProcessesByName(processName).Where(p => p.Id != currentPid))
+            {
+                try { proc.Kill(); proc.WaitForExit(3000); } catch { }
+            }
         }
 
         public static async Task TryAcquireSingletonWithTimeout(int timeoutMs)

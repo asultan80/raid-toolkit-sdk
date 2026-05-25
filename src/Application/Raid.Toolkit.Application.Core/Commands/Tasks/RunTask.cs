@@ -56,7 +56,10 @@ namespace Raid.Toolkit.Application.Core.Commands.Tasks
                         int? result = await TryActivateCurrentProcess();
                         if (result.HasValue)
                             return result.Value;
-                        // stale singleton — continue starting up
+                        // stale/broken instance — kill it and acquire the singleton
+                        SingletonProcess.KillStaleInstances();
+                        await Task.Delay(500);
+                        SingletonProcess.TryAcquireSingleton();
                     }
                 }
             }
