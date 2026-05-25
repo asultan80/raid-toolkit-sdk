@@ -13,6 +13,7 @@
 * Fixed null Logger in ProcessManager (constructor was not assigning the injected logger)
 * Added diagnostic logging to account loading path and process detection for easier troubleshooting
 * Added logging and error handling to GameInstanceManager.AddInstance to surface silent failures in InitializeOrThrow and OnAdded
+* Fixed infinite hang in gRPC type/method calls — added 10-second deadline to all InjectionClient gRPC calls (Il2CppTypeCache, Il2CppTypeInfoLookup); without a deadline the calls block forever when the injection host inside RAID doesn't respond
 
 ## 2.8.x
 

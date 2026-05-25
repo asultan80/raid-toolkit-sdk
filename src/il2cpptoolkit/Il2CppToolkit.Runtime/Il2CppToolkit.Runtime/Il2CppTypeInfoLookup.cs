@@ -271,7 +271,7 @@ public class Il2CppTypeInfoLookup<TClass>
 			};
 		}
 		val.Arguments.AddRange(arguments.Select(ValueFrom));
-		return context.InjectionClient.Il2Cpp.CallMethod(val, (Metadata)null, (DateTime?)null, default(CancellationToken)).ReturnValue;
+		return context.InjectionClient.Il2Cpp.CallMethod(val, (Metadata)null, DateTime.UtcNow.Add(Il2CppTypeCache.kRpcDeadline), default(CancellationToken)).ReturnValue;
 	}
 
 	public static void CallMethod(IRuntimeObject obj, [CallerMemberName] string name = "", object[] arguments = null)

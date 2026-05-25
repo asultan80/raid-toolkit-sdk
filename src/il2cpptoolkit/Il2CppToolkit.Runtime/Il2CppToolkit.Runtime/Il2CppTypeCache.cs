@@ -20,6 +20,8 @@ public class Il2CppTypeCache
 		return runtime.TypeCache.TypeInfoByType.TryGetValue(managedType, out value);
 	}
 
+	internal static readonly TimeSpan kRpcDeadline = TimeSpan.FromSeconds(10);
+
 	public static bool TryGetOrLoadTypeInfoCore(Il2CsRuntimeContext runtime, Type managedType, ulong classAddr, out Il2CppTypeInfo result)
 	{
 		Il2CppTypeCache typeCache = runtime.TypeCache;
@@ -30,10 +32,10 @@ public class Il2CppTypeCache
 		result = typeCache.TypeInfoByType.GetOrAdd(managedType, (Func<Type, Il2CppTypeInfo>)((Type managedType) => (classAddr == 0) ? runtime.InjectionClient.Il2Cpp.GetTypeInfo(new GetTypeInfoRequest
 		{
 			Klass = Il2CppTypeName.GetKlass(managedType)
-		}, (Metadata)null, (DateTime?)null, default(CancellationToken)).TypeInfo : runtime.InjectionClient.Il2Cpp.GetTypeInfo(new GetTypeInfoRequest
+		}, (Metadata)null, DateTime.UtcNow.Add(kRpcDeadline), default(CancellationToken)).TypeInfo : runtime.InjectionClient.Il2Cpp.GetTypeInfo(new GetTypeInfoRequest
 		{
 			Address = classAddr
-		}, (Metadata)null, (DateTime?)null, default(CancellationToken)).TypeInfo));
+		}, (Metadata)null, DateTime.UtcNow.Add(kRpcDeadline), default(CancellationToken)).TypeInfo));
 		if (result == null)
 		{
 			return false;
