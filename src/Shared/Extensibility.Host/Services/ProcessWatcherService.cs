@@ -36,6 +36,7 @@ namespace Raid.Toolkit.Extensibility.Host.Services
 
         private void OnProcessFound(object sender, IProcessManager.ProcessEventArgs e)
         {
+            Logger.LogInformation("ProcessWatcherService.OnProcessFound: pid={pid}", e.Id);
             using TrackedOperation createInstanceOp = ErrorService.TrackOperation(
                 ServiceErrorCategory.Process,
                 e.Id.ToString(),

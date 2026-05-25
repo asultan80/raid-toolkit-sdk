@@ -12,6 +12,7 @@
 * Fixed accounts not loading — AccountManager now catches up with game instances that started before it subscribed to the OnAdded event (race condition on startup)
 * Fixed null Logger in ProcessManager (constructor was not assigning the injected logger)
 * Added diagnostic logging to account loading path and process detection for easier troubleshooting
+* Added logging and error handling to GameInstanceManager.AddInstance to surface silent failures in InitializeOrThrow and OnAdded
 
 ## 2.8.x
 

@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Raid.Toolkit.Extensibility.Host
 {
@@ -13,6 +14,7 @@ namespace Raid.Toolkit.Extensibility.Host
         private readonly ConcurrentDictionary<int, IGameInstance> _Instances = new();
         private readonly ConcurrentDictionary<int, IGameInstance> _RawInstances = new();
         private readonly IServiceProvider ServiceProvider;
+        private readonly ILogger<GameInstanceManager> Logger;
         private bool HasCheckedStaticData;
 
         public IReadOnlyList<IGameInstance> Instances => _Instances.Values.ToList();
@@ -21,8 +23,10 @@ namespace Raid.Toolkit.Extensibility.Host
 
         public GameInstanceManager(
             IServiceProvider serviceProvider,
-            IHostApplicationLifetime lifetime)
+            IHostApplicationLifetime lifetime,
+            ILogger<GameInstanceManager> logger)
         {
+            Logger = logger;
             ServiceProvider = serviceProvider;
             _ = lifetime.ApplicationStopped.Register(() =>
             {
@@ -50,11 +54,30 @@ namespace Raid.Toolkit.Extensibility.Host
 
         public void AddInstance(Process process)
         {
+            Logger.LogInformation("GameInstanceManager.AddInstance: pid={pid}", process.Id);
             IGameInstance instance = _RawInstances.GetOrAdd(process.Id, (token) => ActivatorUtilities.CreateInstance<GameInstance>(ServiceProvider, process));
-            instance.InitializeOrThrow(process);
+            try
+            {
+                instance.InitializeOrThrow(process);
+                Logger.LogInformation("GameInstanceManager.AddInstance: InitializeOrThrow succeeded, id={id}", instance.Id);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "GameInstanceManager.AddInstance: InitializeOrThrow failed for pid={pid}", process.Id);
+                throw;
+            }
 
             _ = _Instances.TryAdd(instance.Token, instance);
-            OnAdded?.Raise(this, new(instance));
+            Logger.LogInformation("GameInstanceManager.AddInstance: firing OnAdded for id={id}", instance.Id);
+            try
+            {
+                OnAdded?.Raise(this, new(instance));
+                Logger.LogInformation("GameInstanceManager.AddInstance: OnAdded completed for id={id}", instance.Id);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "GameInstanceManager.AddInstance: OnAdded threw for id={id}", instance.Id);
+            }
         }
 
         public void RemoveInstance(int token)
