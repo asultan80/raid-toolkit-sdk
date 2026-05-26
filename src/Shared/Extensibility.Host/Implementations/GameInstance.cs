@@ -14,8 +14,16 @@ namespace Raid.Toolkit.Extensibility.Host
         public string AvatarUrl { get; private set; }
         private bool IsDisposed;
 
+        private readonly ITypeInfoProvider? _typeInfoProvider;
+
         public Il2CsRuntimeContext Runtime { get; private set; }
         public PropertyBag Properties { get; } = new();
+
+        public GameInstance(Process proc, ITypeInfoProvider typeInfoProvider)
+        {
+            Token = proc.Id;
+            _typeInfoProvider = typeInfoProvider;
+        }
 
         public GameInstance(Process proc)
         {
@@ -25,6 +33,8 @@ namespace Raid.Toolkit.Extensibility.Host
         public void InitializeOrThrow(Process proc)
         {
             Runtime ??= new(proc);
+            if (_typeInfoProvider != null)
+                Runtime.FallbackTypeInfoProvider = _typeInfoProvider;
 
             ErrorHandler.VerifyElseThrow(Runtime != null, ServiceError.MethodCalledBeforeInitialization, "Method cannot be called before intialization");
             var appModel = AppModel._instance.GetValue(Runtime);

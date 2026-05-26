@@ -30,6 +30,8 @@ public class Il2CsRuntimeContext : IMemorySource, IDisposable
 
 	public Process TargetProcess { get; }
 
+	public ITypeInfoProvider FallbackTypeInfoProvider { get; set; }
+
 	public IMemorySource Parent => null;
 
 	public Il2CsRuntimeContext ParentContext => this;

@@ -6,6 +6,7 @@ using Raid.Toolkit.Extensibility.DataServices;
 using Raid.Toolkit.Extensibility.Host.Services;
 using Raid.Toolkit.Extensibility.Notifications;
 using Raid.Toolkit.Extensibility.Services;
+using Il2CppToolkit.Runtime;
 using Raid.Toolkit.Model;
 
 namespace Raid.Toolkit.Extensibility.Host
@@ -35,6 +36,7 @@ namespace Raid.Toolkit.Extensibility.Host
                 services
                 .AddSingleton<ExtensionHost>()
                 .AddSingleton<IModelLoader, ModelLoader>()
+                .AddSingleton<ITypeInfoProvider, BinaryTypeInfoProvider>()
                 .AddSingleton<IPackageLoader, SandboxedPackageLoader>()
                 .AddSingleton<IPackageInstanceFactory, PackageFactory>()
                 .AddSingleton<IScopedServiceManager, ScopedServiceManager>()
