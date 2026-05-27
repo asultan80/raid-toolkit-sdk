@@ -14,6 +14,7 @@
         <PackageReference Include="Il2CppToolkit.ReverseCompiler" Version="2.1.1-alpha" />
         <PackageReference Include="Il2CppToolkit.Runtime" Version="2.1.1-alpha" />
         <PackageReference Include="Il2CppToolkit.Target.NetCore" Version="2.1.1-alpha" />
+        <Compile Remove="BinaryTypeInfoProvider.cs" />
     </ItemGroup>
 
     <ItemGroup>
