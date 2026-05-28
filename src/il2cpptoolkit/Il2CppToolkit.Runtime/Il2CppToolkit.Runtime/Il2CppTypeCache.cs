@@ -31,18 +31,13 @@ public class Il2CppTypeCache
 		}
 		result = typeCache.TypeInfoByType.GetOrAdd(managedType, (Type mt) =>
 		{
-			try
-			{
-				return (classAddr == 0)
-					? runtime.InjectionClient.Il2Cpp.GetTypeInfo(new GetTypeInfoRequest { Klass = Il2CppTypeName.GetKlass(mt) }, (Metadata)null, DateTime.UtcNow.Add(kRpcDeadline), default(CancellationToken)).TypeInfo
-					: runtime.InjectionClient.Il2Cpp.GetTypeInfo(new GetTypeInfoRequest { Address = classAddr }, (Metadata)null, DateTime.UtcNow.Add(kRpcDeadline), default(CancellationToken)).TypeInfo;
-			}
-			catch (RpcException)
-			{
-				if (runtime.FallbackTypeInfoProvider?.TryGetTypeInfo(runtime, mt, out Il2CppTypeInfo fallback) == true)
-					return fallback;
-				throw;
-			}
+			// Try binary fallback first — avoids 10-second gRPC timeout when injection host is incompatible
+			if (runtime.FallbackTypeInfoProvider?.TryGetTypeInfo(runtime, mt, out Il2CppTypeInfo fallback) == true)
+				return fallback;
+
+			return (classAddr == 0)
+				? runtime.InjectionClient.Il2Cpp.GetTypeInfo(new GetTypeInfoRequest { Klass = Il2CppTypeName.GetKlass(mt) }, (Metadata)null, DateTime.UtcNow.Add(kRpcDeadline), default(CancellationToken)).TypeInfo
+				: runtime.InjectionClient.Il2Cpp.GetTypeInfo(new GetTypeInfoRequest { Address = classAddr }, (Metadata)null, DateTime.UtcNow.Add(kRpcDeadline), default(CancellationToken)).TypeInfo;
 		});
 		if (result == null)
 		{

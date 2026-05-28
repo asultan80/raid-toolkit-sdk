@@ -15,6 +15,7 @@
 * Added logging and error handling to GameInstanceManager.AddInstance to surface silent failures in InitializeOrThrow and OnAdded
 * Fixed infinite hang in gRPC type/method calls — added 10-second deadline to all InjectionClient gRPC calls (Il2CppTypeCache, Il2CppTypeInfoLookup); without a deadline the calls block forever when the injection host inside RAID doesn't respond
 * Added binary metadata bypass (BinaryTypeInfoProvider) — when gRPC type resolution fails (RpcException/DeadlineExceeded), RTK now falls back to reading type/field info directly from GameAssembly.dll and global-metadata.dat; resolves class pointers via MetadataUsages slots with ASLR adjustment, reads static_fields pointer from Il2CppClass at runtime; accounts now load even when the injection host DLL is incompatible with the current game build
+* Fixed binary fallback failing for generic types (e.g. SingleInstance&lt;AppModel&gt;) — BuildMaps now iterates MetadataUsages entries using TypeModel.GetTypeName for canonical names (handles GENERICINST correctly); GetIl2CppTypeName now mirrors TypeModel's naming format (namespace only on outermost type, no namespace on generic args); fallback is tried before gRPC to avoid 10-second timeout per type
 
 ## 2.8.x
 
