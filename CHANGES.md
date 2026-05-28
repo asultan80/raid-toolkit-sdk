@@ -2,6 +2,7 @@
 
 ## 2.9.x
 
+* Added diagnostic: OpenProcess failure now throws immediately with Win32 error code (5=ACCESS_DENIED means RAID runs elevated; run RTK as admin) instead of a silent RT2 cascade; RT2 structured exceptions now include stack traces in logs
 * Fixed BinaryTypeInfoProvider crash in v27+ metadata (NullReferenceException on null metadataUsageDic) — added separate v27+ code path that builds type name index from il2cpp.Types[] instead of metadataUsageDic; for GENERICINST types resolves Il2CppClass* via Il2CppGenericClass.cached_class (offset 24) at runtime; corrected static_fields offset from 96 to 176 (0xB0)
 
 * Added support for IL2CPP metadata version 31 (required for current RAID: Shadow Legends game update)
