@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using Il2CppToolkit.Injection.Client;
 using Il2CppToolkit.Runtime.Types;
@@ -43,6 +44,13 @@ public class Il2CsRuntimeContext : IMemorySource, IDisposable
 		TargetProcess = target;
 		InjectionClient = new InjectionClient(target);
 		processHandle = NativeWrapper.OpenProcess((ProcessAccessFlags)16, true, TargetProcess.Id);
+		if (processHandle == IntPtr.Zero)
+		{
+			int err = new Win32Exception().NativeErrorCode;
+			throw new InvalidOperationException(
+				$"[Il2CsRuntimeContext] OpenProcess(PROCESS_VM_READ) failed for pid={target.Id}: Win32Error={err} " +
+				$"(5=ACCESS_DENIED means RAID runs elevated; run RTK as admin)");
+		}
 	}
 
 	public void Dispose()

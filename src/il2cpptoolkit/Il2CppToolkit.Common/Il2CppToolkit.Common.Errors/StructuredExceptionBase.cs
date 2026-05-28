@@ -20,6 +20,8 @@ public class StructuredExceptionBase : Exception
 
 	public override string ToString()
 	{
-		return $"{Severity.ToString().ToLowerInvariant()} {Category.Abbreviation}{ErrorCode}: {Message}";
+		string header = $"{Severity.ToString().ToLowerInvariant()} {Category.Abbreviation}{ErrorCode}: {Message}";
+		string stack = StackTrace;
+		return string.IsNullOrEmpty(stack) ? header : $"{header}\n{stack}";
 	}
 }

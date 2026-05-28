@@ -145,7 +145,11 @@ namespace Raid.Toolkit.Model
             };
             result.Fields.AddRange(BuildFields(typeDef));
 
-            _logger?.LogDebug("[BinaryTypeInfoProvider] v27+ {Name}: fields={N}", il2cppName, result.Fields.Count);
+            if (staticFieldsAddr == 0)
+                _logger?.LogWarning("[BinaryTypeInfoProvider] v27+ {Name}: StaticFieldsAddress=0 (classPtr=0 for CLASS/VALUETYPE — static field reads will fail)", il2cppName);
+
+            _logger?.LogDebug("[BinaryTypeInfoProvider] v27+ {Name}: classPtr=0x{C:X}, staticFields=0x{SF:X}, fields={N}",
+                il2cppName, classPtr, staticFieldsAddr, result.Fields.Count);
             return true;
         }
 
