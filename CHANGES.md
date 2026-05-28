@@ -2,6 +2,8 @@
 
 ## 2.9.x
 
+* Fixed BinaryTypeInfoProvider crash in v27+ metadata (NullReferenceException on null metadataUsageDic) — added separate v27+ code path that builds type name index from il2cpp.Types[] instead of metadataUsageDic; for GENERICINST types resolves Il2CppClass* via Il2CppGenericClass.cached_class (offset 24) at runtime; corrected static_fields offset from 96 to 176 (0xB0)
+
 * Added support for IL2CPP metadata version 31 (required for current RAID: Shadow Legends game update)
 * Fixed assembly version mismatch on launch caused by il2cpptoolkit DLLs not being included in the installer
 * Fixed multiple RTK instances launching when a broken/stale instance was already running

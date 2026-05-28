@@ -14,12 +14,25 @@ namespace Raid.Toolkit.Model
 {
     public class BinaryTypeInfoProvider : ITypeInfoProvider
     {
+        // Il2CppClass field offsets (confirmed by ClassDefinition.cs: name@16, namespace@24, parent@80, base@88)
+        private const ulong kClassNameOffset = 16;       // const char* name
+        private const ulong kClassNamespaceOffset = 24;  // const char* namespaze
+        private const ulong kStaticFieldsOffset = 176;   // void* static_fields (0xB0): after generic_class@96 + 8 more pointers
+
+        // Il2CppGenericClass offsets for v27+ (type@0, context@8/16, cached_class@24)
+        private const ulong kCachedClassOffset = 24;
+
         private readonly ILogger<BinaryTypeInfoProvider> _logger;
         private readonly object _initLock = new object();
 
         private TypeModel _typeModel;
-        // Maps canonical IL2CPP type name → (MetadataUsages destIndex, typeDef index for field lookup)
+        private bool _isV27Plus;
+
+        // v<27: Maps canonical IL2CPP type name → (MetadataUsages destIndex, typeDef index)
         private Dictionary<string, (uint destIndex, int typeDefIndex)> _typeNameToSlot;
+
+        // v27+: Maps canonical IL2CPP type name → (il2cpp.Types[] index, typeDef index)
+        private Dictionary<string, (int typeIndex, int typeDefIndex)> _typeNameToTypeIndex;
 
         public BinaryTypeInfoProvider(ILogger<BinaryTypeInfoProvider> logger = null)
         {
@@ -40,53 +53,153 @@ namespace Raid.Toolkit.Model
                     return false;
                 }
 
-                if (!_typeNameToSlot!.TryGetValue(il2cppName, out var slot))
-                {
-                    _logger?.LogDebug("[BinaryTypeInfoProvider] Not in MetadataUsages: {Name}", il2cppName);
-                    return false;
-                }
+                if (_isV27Plus)
+                    return TryGetTypeInfoV27Plus(runtime, managedType, il2cppName, out result);
 
-                var (destIndex, typeDefIndex) = slot;
-                var il2cpp = _typeModel!.Il2Cpp;
-
-                if (il2cpp.MetadataUsages == null || destIndex >= (uint)il2cpp.MetadataUsages.Length)
-                {
-                    _logger?.LogWarning("[BinaryTypeInfoProvider] MetadataUsages out of range: {Name}", il2cppName);
-                    return false;
-                }
-
-                ulong slide = GetAslrSlide(runtime);
-                ulong slotVA = il2cpp.MetadataUsages[destIndex];
-                ulong slotAddr = slotVA + slide;
-
-                ulong classPtr = runtime.ReadPointer(slotAddr);
-                if (classPtr == 0)
-                {
-                    _logger?.LogWarning("[BinaryTypeInfoProvider] Null classPtr: {Name}", il2cppName);
-                    return false;
-                }
-
-                // Read static_fields pointer from Il2CppClass at offset +96
-                ulong staticFieldsAddr = runtime.ReadPointer(classPtr + 96);
-
-                var typeDef = _typeModel.Metadata.typeDefs[typeDefIndex];
-                var fields = BuildFields(typeDef);
-
-                result = new Il2CppTypeInfo
-                {
-                    KlassId = new ClassId { Address = classPtr },
-                    StaticFieldsAddress = staticFieldsAddr
-                };
-                result.Fields.AddRange(fields);
-
-                _logger?.LogDebug("[BinaryTypeInfoProvider] Resolved {Name}: classPtr=0x{C:X}, staticFields=0x{SF:X}, fields={N}",
-                    il2cppName, classPtr, staticFieldsAddr, result.Fields.Count);
-                return true;
+                return TryGetTypeInfoV26(runtime, managedType, il2cppName, out result);
             }
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "[BinaryTypeInfoProvider] Failed: {Name}", managedType.FullName);
                 return false;
+            }
+        }
+
+        private bool TryGetTypeInfoV26(Il2CsRuntimeContext runtime, Type managedType, string il2cppName, out Il2CppTypeInfo result)
+        {
+            result = null;
+            if (!_typeNameToSlot!.TryGetValue(il2cppName, out var slot))
+            {
+                _logger?.LogDebug("[BinaryTypeInfoProvider] Not in MetadataUsages: {Name}", il2cppName);
+                return false;
+            }
+
+            var (destIndex, typeDefIndex) = slot;
+            var il2cpp = _typeModel!.Il2Cpp;
+
+            if (il2cpp.MetadataUsages == null || destIndex >= (uint)il2cpp.MetadataUsages.Length)
+            {
+                _logger?.LogWarning("[BinaryTypeInfoProvider] MetadataUsages out of range: {Name}", il2cppName);
+                return false;
+            }
+
+            ulong slide = GetAslrSlide(runtime);
+            ulong slotVA = il2cpp.MetadataUsages[destIndex];
+            ulong slotAddr = slotVA + slide;
+            ulong classPtr = runtime.ReadPointer(slotAddr);
+
+            if (classPtr == 0)
+            {
+                _logger?.LogWarning("[BinaryTypeInfoProvider] Null classPtr: {Name}", il2cppName);
+                return false;
+            }
+
+            ulong staticFieldsAddr = runtime.ReadPointer(classPtr + kStaticFieldsOffset);
+            var typeDef = _typeModel.Metadata.typeDefs[typeDefIndex];
+
+            result = new Il2CppTypeInfo
+            {
+                KlassId = new ClassId { Address = classPtr },
+                StaticFieldsAddress = staticFieldsAddr
+            };
+            result.Fields.AddRange(BuildFields(typeDef));
+
+            _logger?.LogDebug("[BinaryTypeInfoProvider] v26 resolved {Name}: classPtr=0x{C:X}, staticFields=0x{SF:X}, fields={N}",
+                il2cppName, classPtr, staticFieldsAddr, result.Fields.Count);
+            return true;
+        }
+
+        private bool TryGetTypeInfoV27Plus(Il2CsRuntimeContext runtime, Type managedType, string il2cppName, out Il2CppTypeInfo result)
+        {
+            result = null;
+            if (!_typeNameToTypeIndex!.TryGetValue(il2cppName, out var entry))
+            {
+                _logger?.LogDebug("[BinaryTypeInfoProvider] v27+ Not in type index: {Name}", il2cppName);
+                return false;
+            }
+
+            var (typeIndex, typeDefIndex) = entry;
+            var il2cpp = _typeModel!.Il2Cpp;
+            Il2CppType il2cppType = il2cpp.Types[typeIndex];
+            ulong slide = GetAslrSlide(runtime);
+
+            ulong classPtr = TryGetClassPtrV27(runtime, il2cppType, slide, il2cppName);
+            ulong staticFieldsAddr = 0;
+
+            if (classPtr != 0)
+            {
+                staticFieldsAddr = runtime.ReadPointer(classPtr + kStaticFieldsOffset);
+                _logger?.LogDebug("[BinaryTypeInfoProvider] v27+ resolved {Name}: classPtr=0x{C:X}, staticFields=0x{SF:X}",
+                    il2cppName, classPtr, staticFieldsAddr);
+            }
+            else
+            {
+                _logger?.LogDebug("[BinaryTypeInfoProvider] v27+ no classPtr for {Name}, returning fields only", il2cppName);
+            }
+
+            var typeDef = _typeModel.Metadata.typeDefs[typeDefIndex];
+            result = new Il2CppTypeInfo
+            {
+                KlassId = new ClassId { Address = classPtr },
+                StaticFieldsAddress = staticFieldsAddr
+            };
+            result.Fields.AddRange(BuildFields(typeDef));
+
+            _logger?.LogDebug("[BinaryTypeInfoProvider] v27+ {Name}: fields={N}", il2cppName, result.Fields.Count);
+            return true;
+        }
+
+        private ulong TryGetClassPtrV27(Il2CsRuntimeContext runtime, Il2CppType il2cppType, ulong slide, string name)
+        {
+            try
+            {
+                if (il2cppType.type == Il2CppTypeEnum.IL2CPP_TYPE_GENERICINST)
+                {
+                    ulong genericClassBinaryVA = il2cppType.data.generic_class;
+                    if (genericClassBinaryVA == 0)
+                    {
+                        _logger?.LogWarning("[BinaryTypeInfoProvider] GENERICINST has null generic_class VA: {Name}", name);
+                        return 0;
+                    }
+
+                    // Il2CppGenericClass layout for v27+:
+                    //   +0:  type (ulong, pointer to Il2CppType)
+                    //   +8:  context.class_inst (ulong)
+                    //   +16: context.method_inst (ulong)
+                    //   +24: cached_class (ulong, the Il2CppClass* set at runtime)
+                    ulong cachedClassRuntimeAddr = genericClassBinaryVA + slide + kCachedClassOffset;
+                    ulong classPtr = runtime.ReadPointer(cachedClassRuntimeAddr);
+
+                    _logger?.LogDebug(
+                        "[BinaryTypeInfoProvider] GENERICINST {Name}: genericClassBinaryVA=0x{GVA:X}, cachedClassAddr=0x{CCA:X}, classPtr=0x{CP:X}",
+                        name, genericClassBinaryVA, cachedClassRuntimeAddr, classPtr);
+
+                    if (classPtr != 0)
+                    {
+                        // Sanity check: verify name string at classPtr + kClassNameOffset
+                        try
+                        {
+                            ulong namePtr = runtime.ReadPointer(classPtr + kClassNameOffset);
+                            if (namePtr != 0)
+                            {
+                                string className = ReadProcessString(runtime, namePtr, 128);
+                                _logger?.LogDebug("[BinaryTypeInfoProvider] classPtr name check: '{ClassName}' (expected generic type name)", className);
+                            }
+                        }
+                        catch { /* name check is diagnostic only */ }
+                    }
+
+                    return classPtr;
+                }
+
+                // CLASS / VALUETYPE: no classPtr available in v27+ without MetadataUsages
+                _logger?.LogDebug("[BinaryTypeInfoProvider] v27+ CLASS/VALUETYPE {Name} ({T}): returning classPtr=0", name, il2cppType.type);
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "[BinaryTypeInfoProvider] TryGetClassPtrV27 failed for {Name}", name);
+                return 0;
             }
         }
 
@@ -112,20 +225,37 @@ namespace Raid.Toolkit.Model
             loader.Init(gasmPath, metadataPath);
             _typeModel = new TypeModel(loader);
             BuildMaps();
-            _logger?.LogInformation("[BinaryTypeInfoProvider] Ready: {Count} types in MetadataUsages",
-                _typeNameToSlot!.Count);
+            _logger?.LogInformation("[BinaryTypeInfoProvider] Ready: v27+={V27}, types={Count}",
+                _isV27Plus,
+                _isV27Plus ? _typeNameToTypeIndex?.Count ?? 0 : _typeNameToSlot?.Count ?? 0);
         }
 
         private void BuildMaps()
         {
-            _typeNameToSlot = new Dictionary<string, (uint, int)>(StringComparer.Ordinal);
-
             var metadata = _typeModel!.Metadata;
             var il2cpp = _typeModel.Il2Cpp;
 
+            if (metadata.metadataUsageDic != null)
+            {
+                // v<27: use MetadataUsages slot dictionary
+                _isV27Plus = false;
+                _typeNameToSlot = new Dictionary<string, (uint, int)>(StringComparer.Ordinal);
+                BuildMapsV26(metadata, il2cpp);
+            }
+            else
+            {
+                // v27+: metadataUsageDic is null; build name→typeIndex map from il2cpp.Types[]
+                _isV27Plus = true;
+                _typeNameToTypeIndex = new Dictionary<string, (int, int)>(StringComparer.Ordinal);
+                BuildMapsV27Plus(il2cpp);
+            }
+        }
+
+        private void BuildMapsV26(Metadata metadata, Il2Cpp il2cpp)
+        {
             if (!metadata.metadataUsageDic.TryGetValue(Il2CppMetadataUsage.kIl2CppMetadataUsageTypeInfo, out var usageDic))
             {
-                _logger?.LogWarning("[BinaryTypeInfoProvider] No kIl2CppMetadataUsageTypeInfo entries in metadata");
+                _logger?.LogWarning("[BinaryTypeInfoProvider] No kIl2CppMetadataUsageTypeInfo in metadataUsageDic");
                 return;
             }
 
@@ -137,18 +267,33 @@ namespace Raid.Toolkit.Model
                 if (typeIndex >= (uint)il2cpp.Types.Length) continue;
                 Il2CppType il2cppType = il2cpp.Types[(int)typeIndex];
 
-                // Get the typeDef index for field lookup
                 int typeDefIndex = GetTypeDefIndex(il2cppType);
                 if (typeDefIndex < 0) continue;
 
-                // Compute the canonical name via TypeModel — this correctly handles
-                // generic instantiations (GENERICINST) by using the actual type args
                 string name;
                 try { name = _typeModel.GetTypeName(il2cppType, addNamespace: true, is_nested: false); }
                 catch { continue; }
                 if (string.IsNullOrEmpty(name)) continue;
 
                 _typeNameToSlot[name] = (destIndex, typeDefIndex);
+            }
+        }
+
+        private void BuildMapsV27Plus(Il2Cpp il2cpp)
+        {
+            for (int i = 0; i < il2cpp.Types.Length; i++)
+            {
+                Il2CppType il2cppType = il2cpp.Types[i];
+
+                int typeDefIndex = GetTypeDefIndex(il2cppType);
+                if (typeDefIndex < 0) continue;
+
+                string name;
+                try { name = _typeModel.GetTypeName(il2cppType, addNamespace: true, is_nested: false); }
+                catch { continue; }
+                if (string.IsNullOrEmpty(name)) continue;
+
+                _typeNameToTypeIndex[name] = (i, typeDefIndex);
             }
         }
 
@@ -192,7 +337,6 @@ namespace Raid.Toolkit.Model
             {
                 int fieldDefIndex = typeDef.fieldStart + i;
                 var fieldDef = metadata.fieldDefs[fieldDefIndex];
-                // Raw metadata name matches what StaticFieldMember was constructed with
                 string fieldName = metadata.GetStringFromIndex(fieldDef.nameIndex);
                 var fieldType = il2cpp.Types[fieldDef.typeIndex];
                 bool isStatic = ((FieldAttributes)fieldType.attrs).HasFlag(FieldAttributes.Static);
@@ -208,6 +352,19 @@ namespace Raid.Toolkit.Model
             }
 
             return fields;
+        }
+
+        private static string ReadProcessString(Il2CsRuntimeContext runtime, ulong ptr, int maxLen = 256)
+        {
+            if (ptr == 0) return null;
+            try
+            {
+                var bytes = runtime.ReadMemory(ptr, (ulong)maxLen).ToArray();
+                int len = Array.IndexOf(bytes, (byte)0);
+                if (len < 0) len = maxLen;
+                return System.Text.Encoding.UTF8.GetString(bytes, 0, len);
+            }
+            catch { return null; }
         }
 
         // Mirrors TypeModel.GetTypeName(addNamespace, is_nested) format exactly:
@@ -231,7 +388,6 @@ namespace Raid.Toolkit.Model
             }
 
             // Use generic type definition's name to get the backtick-stripped base name
-            // (e.g. "List`1" → "List", "AppModel" → "AppModel")
             string name = type.IsConstructedGenericType
                 ? type.GetGenericTypeDefinition().Name
                 : type.Name;
@@ -244,7 +400,6 @@ namespace Raid.Toolkit.Model
 
             if (type.IsConstructedGenericType)
             {
-                // Format args without namespace, joined with ", " (matches GetGenericInstParams)
                 IEnumerable<string> args = type.GenericTypeArguments.Select(a => GetIl2CppTypeName(a, addNamespace: false));
                 text += "<" + string.Join(", ", args) + ">";
             }
