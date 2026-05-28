@@ -283,17 +283,21 @@ namespace Raid.Toolkit.Model
         {
             for (int i = 0; i < il2cpp.Types.Length; i++)
             {
-                Il2CppType il2cppType = il2cpp.Types[i];
+                try
+                {
+                    Il2CppType il2cppType = il2cpp.Types[i];
 
-                int typeDefIndex = GetTypeDefIndex(il2cppType);
-                if (typeDefIndex < 0) continue;
+                    int typeDefIndex = GetTypeDefIndex(il2cppType);
+                    if (typeDefIndex < 0) continue;
 
-                string name;
-                try { name = _typeModel.GetTypeName(il2cppType, addNamespace: true, is_nested: false); }
-                catch { continue; }
-                if (string.IsNullOrEmpty(name)) continue;
+                    string name;
+                    try { name = _typeModel.GetTypeName(il2cppType, addNamespace: true, is_nested: false); }
+                    catch { continue; }
+                    if (string.IsNullOrEmpty(name)) continue;
 
-                _typeNameToTypeIndex[name] = (i, typeDefIndex);
+                    _typeNameToTypeIndex[name] = (i, typeDefIndex);
+                }
+                catch { /* skip types that fail to process */ }
             }
         }
 
