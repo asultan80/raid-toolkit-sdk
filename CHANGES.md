@@ -5,7 +5,7 @@
 * Added diagnostic: scan Il2CppClass offsets 152–200 with non-zero values logged to find correct static_fields offset in v31; classPtr name verified from memory
 * Added diagnostic: GENERICINST resolution logs VA, slide, and computed runtime address at Warning level; ReadMemory errors include the failing address and handle value
 * Added diagnostic: OpenProcess failure now throws immediately with Win32 error code (5=ACCESS_DENIED means RAID runs elevated; run RTK as admin) instead of a silent RT2 cascade; RT2 structured exceptions now include stack traces in logs
-* Fixed BinaryTypeInfoProvider crash in v27+ metadata (NullReferenceException on null metadataUsageDic) — added separate v27+ code path that builds type name index from il2cpp.Types[] instead of metadataUsageDic; for GENERICINST types resolves Il2CppClass* via Il2CppGenericClass.cached_class (offset 24) at runtime; corrected static_fields offset from 96 to 176 (0xB0)
+* Fixed BinaryTypeInfoProvider crash in v27+ metadata (NullReferenceException on null metadataUsageDic) — added separate v27+ code path that builds type name index from il2cpp.Types[] instead of metadataUsageDic; for GENERICINST types resolves Il2CppClass* via Il2CppGenericClass.cached_class (offset 24) at runtime; corrected static_fields offset to 184 (0xB8) — IL2CPP v31 (Unity 2022.3) adds a klass self-reference pointer at +120 shifting static_fields from 0xB0 to 0xB8; confirmed via offset scan of live Il2CppClass in memory
 
 * Added support for IL2CPP metadata version 31 (required for current RAID: Shadow Legends game update)
 * Fixed assembly version mismatch on launch caused by il2cpptoolkit DLLs not being included in the installer

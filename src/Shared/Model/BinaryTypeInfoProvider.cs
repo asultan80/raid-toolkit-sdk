@@ -17,7 +17,7 @@ namespace Raid.Toolkit.Model
         // Il2CppClass field offsets (confirmed by ClassDefinition.cs: name@16, namespace@24, parent@80, base@88)
         private const ulong kClassNameOffset = 16;       // const char* name
         private const ulong kClassNamespaceOffset = 24;  // const char* namespaze
-        private const ulong kStaticFieldsOffset = 176;   // void* static_fields (0xB0): after generic_class@96 + 8 more pointers
+        private const ulong kStaticFieldsOffset = 184;   // void* static_fields (0xB8): IL2CPP v31 (Unity 2022.3) adds klass self-ref at +120, shifting static_fields from 0xB0 to 0xB8
 
         // Il2CppGenericClass offsets for v27+ (type@0, context@8/16, cached_class@24)
         private const ulong kCachedClassOffset = 24;
