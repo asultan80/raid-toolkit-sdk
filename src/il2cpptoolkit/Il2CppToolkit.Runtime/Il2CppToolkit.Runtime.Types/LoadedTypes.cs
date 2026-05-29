@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Il2CppToolkit.Runtime.Types.Reflection;
 
@@ -33,7 +34,15 @@ public static class LoadedTypes
 			{
 				continue;
 			}
-			Type[] types = assembly.GetTypes();
+			Type[] types;
+			try
+			{
+				types = assembly.GetTypes();
+			}
+			catch (ReflectionTypeLoadException ex)
+			{
+				types = ex.Types.Where(t => t != null).ToArray();
+			}
 			foreach (Type type in types)
 			{
 				if (type.GetCustomAttribute<GeneratedAttribute>() != null)

@@ -2,6 +2,7 @@
 
 ## 2.9.x
 
+* Fixed LoadedTypes crash (ReflectionTypeLoadException) when Raid.Interop.dll contains types with unsatisfiable generic constraints or Newtonsoft.Json version mismatches — assembly.GetTypes() now catches ReflectionTypeLoadException and uses successfully-loaded types via ex.Types
 * Added diagnostic: scan Il2CppClass offsets 152–200 with non-zero values logged to find correct static_fields offset in v31; classPtr name verified from memory
 * Added diagnostic: GENERICINST resolution logs VA, slide, and computed runtime address at Warning level; ReadMemory errors include the failing address and handle value
 * Added diagnostic: OpenProcess failure now throws immediately with Win32 error code (5=ACCESS_DENIED means RAID runs elevated; run RTK as admin) instead of a silent RT2 cascade; RT2 structured exceptions now include stack traces in logs
