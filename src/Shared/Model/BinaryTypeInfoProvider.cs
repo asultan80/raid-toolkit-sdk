@@ -174,9 +174,9 @@ namespace Raid.Toolkit.Model
                     ulong cachedClassRuntimeAddr = genericClassBinaryVA + slide + kCachedClassOffset;
                     ulong classPtr = runtime.ReadPointer(cachedClassRuntimeAddr);
 
-                    _logger?.LogDebug(
-                        "[BinaryTypeInfoProvider] GENERICINST {Name}: genericClassBinaryVA=0x{GVA:X}, cachedClassAddr=0x{CCA:X}, classPtr=0x{CP:X}",
-                        name, genericClassBinaryVA, cachedClassRuntimeAddr, classPtr);
+                    _logger?.LogWarning(
+                        "[BinaryTypeInfoProvider] GENERICINST {Name}: genericClassBinaryVA=0x{GVA:X}, slide=0x{Slide:X}, cachedClassAddr=0x{CCA:X}, classPtr=0x{CP:X}",
+                        name, genericClassBinaryVA, slide, cachedClassRuntimeAddr, classPtr);
 
                     if (classPtr != 0)
                     {

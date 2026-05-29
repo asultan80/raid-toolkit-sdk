@@ -64,7 +64,7 @@ public class Il2CsRuntimeContext : IMemorySource, IDisposable
 		byte[] array = new byte[size];
 		if (!NativeWrapper.ReadProcessMemoryArray<byte>(processHandle, (IntPtr)(long)address, array))
 		{
-			StructuredErrorExtensions.Raise<RuntimeError>(RuntimeError.ReadProcessMemoryReadFailed, $"Failed to read memory location. GetLastError() = {NativeWrapper.LastError}");
+			StructuredErrorExtensions.Raise<RuntimeError>(RuntimeError.ReadProcessMemoryReadFailed, $"Failed to read memory at 0x{address:X} (size={size}, handle=0x{processHandle.ToInt64():X}). GetLastError() = {NativeWrapper.LastError}");
 		}
 		return new ReadOnlyMemory<byte>(array);
 	}
