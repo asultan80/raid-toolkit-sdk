@@ -180,17 +180,25 @@ namespace Raid.Toolkit.Model
 
                     if (classPtr != 0)
                     {
-                        // Sanity check: verify name string at classPtr + kClassNameOffset
                         try
                         {
                             ulong namePtr = runtime.ReadPointer(classPtr + kClassNameOffset);
-                            if (namePtr != 0)
+                            string className = namePtr != 0 ? ReadProcessString(runtime, namePtr, 128) : "(null)";
+                            _logger?.LogWarning("[BinaryTypeInfoProvider] classPtr=0x{CP:X} name={ClassName}", classPtr, className);
+
+                            // Scan offsets near static_fields to diagnose wrong offset vs uninitialized
+                            for (ulong scan = 152; scan <= 200; scan += 8)
                             {
-                                string className = ReadProcessString(runtime, namePtr, 128);
-                                _logger?.LogDebug("[BinaryTypeInfoProvider] classPtr name check: '{ClassName}' (expected generic type name)", className);
+                                try
+                                {
+                                    ulong val = runtime.ReadPointer(classPtr + scan);
+                                    if (val != 0)
+                                        _logger?.LogWarning("[BinaryTypeInfoProvider]   classPtr+{Offset}=0x{Val:X}", scan, val);
+                                }
+                                catch { }
                             }
                         }
-                        catch { /* name check is diagnostic only */ }
+                        catch { /* diagnostic only */ }
                     }
 
                     return classPtr;
