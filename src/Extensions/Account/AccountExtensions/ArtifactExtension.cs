@@ -10,6 +10,7 @@ using Raid.Toolkit.Extensibility;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace Raid.Toolkit.Extension.Account;
@@ -109,9 +110,16 @@ public class ArtifactExtension :
         Client.Model.Guard.UserWrapper userWrapper = scope.AppModel._userWrapper;
         if (userWrapper.Artifacts.ArtifactData.StorageMigrationState == SharedModel.Meta.Artifacts.ArtifactStorage.ArtifactStorageMigrationState.Migrated)
         {
-            ExternalArtifactsStorage? storage = SharedModel.Meta.Artifacts.ArtifactStorage.ArtifactStorageResolver._implementation.GetValue(scope.Context) as ExternalArtifactsStorage;
-            return storage?._state._artifacts.Values.Select(ModelExtensions.ToModel).ToArray() ?? Array.Empty<Artifact>();
+            try { return GetMigratedArtifacts(scope); }
+            catch (MissingMethodException) { /* ExternalArtifactsStorage._state API changed; fall through */ }
         }
         return userWrapper.Artifacts.ArtifactData.Artifacts.Select(ModelExtensions.ToModel).ToList();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static IReadOnlyList<Artifact> GetMigratedArtifacts(ModelScope scope)
+    {
+        ExternalArtifactsStorage? storage = SharedModel.Meta.Artifacts.ArtifactStorage.ArtifactStorageResolver._implementation.GetValue(scope.Context) as ExternalArtifactsStorage;
+        return storage?._state._artifacts.Values.Select(ModelExtensions.ToModel).ToArray() ?? Array.Empty<Artifact>();
     }
 }

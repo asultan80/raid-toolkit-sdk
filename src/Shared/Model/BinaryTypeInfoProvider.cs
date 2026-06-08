@@ -34,6 +34,9 @@ namespace Raid.Toolkit.Model
         // v27+: Maps canonical IL2CPP type name → (il2cpp.Types[] index, typeDef index)
         private Dictionary<string, (int typeIndex, int typeDefIndex)> _typeNameToTypeIndex;
 
+        // Cached type info for System.String (resolved from metadata, not gRPC)
+        private Il2CppTypeInfo _stringTypeInfo;
+
         public BinaryTypeInfoProvider(ILogger<BinaryTypeInfoProvider> logger = null)
         {
             _logger = logger;
@@ -45,6 +48,14 @@ namespace Raid.Toolkit.Model
             try
             {
                 EnsureInitialized();
+
+                // System.String uses IL2CPP_TYPE_STRING (not CLASS), so it won't appear in the
+                // type maps. Return the metadata-derived field layout from the cached entry.
+                if (managedType == typeof(string))
+                {
+                    result = _stringTypeInfo;
+                    return _stringTypeInfo != null;
+                }
 
                 string il2cppName = GetIl2CppTypeName(managedType);
                 if (il2cppName == null)
@@ -102,7 +113,7 @@ namespace Raid.Toolkit.Model
                 KlassId = new ClassId { Address = classPtr },
                 StaticFieldsAddress = staticFieldsAddr
             };
-            result.Fields.AddRange(BuildFields(typeDef));
+            result.Fields.AddRange(BuildFields(typeDef, typeDefIndex));
 
             _logger?.LogDebug("[BinaryTypeInfoProvider] v26 resolved {Name}: classPtr=0x{C:X}, staticFields=0x{SF:X}, fields={N}",
                 il2cppName, classPtr, staticFieldsAddr, result.Fields.Count);
@@ -114,7 +125,7 @@ namespace Raid.Toolkit.Model
             result = null;
             if (!_typeNameToTypeIndex!.TryGetValue(il2cppName, out var entry))
             {
-                _logger?.LogDebug("[BinaryTypeInfoProvider] v27+ Not in type index: {Name}", il2cppName);
+                _logger?.LogWarning("[BinaryTypeInfoProvider] v27+ Not in type index: {Name}", il2cppName);
                 return false;
             }
 
@@ -122,6 +133,12 @@ namespace Raid.Toolkit.Model
             var il2cpp = _typeModel!.Il2Cpp;
             Il2CppType il2cppType = il2cpp.Types[typeIndex];
             ulong slide = GetAslrSlide(runtime);
+
+            // Verify the name in the map matches what the TypeModel generates for this specific type entry
+            string verifyName = "(error)";
+            try { verifyName = _typeModel.GetTypeName(il2cppType, addNamespace: true, is_nested: false); } catch { }
+            _logger?.LogWarning("[BinaryTypeInfoProvider] v27+ lookup {Name}: typeIndex={TI}, typeEnum={TE}, mapKey={Verify}",
+                il2cppName, typeIndex, il2cppType.type, verifyName);
 
             ulong classPtr = TryGetClassPtrV27(runtime, il2cppType, slide, il2cppName);
             ulong staticFieldsAddr = 0;
@@ -143,7 +160,7 @@ namespace Raid.Toolkit.Model
                 KlassId = new ClassId { Address = classPtr },
                 StaticFieldsAddress = staticFieldsAddr
             };
-            result.Fields.AddRange(BuildFields(typeDef));
+            result.Fields.AddRange(BuildFields(typeDef, typeDefIndex));
 
             if (staticFieldsAddr == 0)
                 _logger?.LogWarning("[BinaryTypeInfoProvider] v27+ {Name}: StaticFieldsAddress=0 (classPtr=0 for CLASS/VALUETYPE — static field reads will fail)", il2cppName);
@@ -174,9 +191,53 @@ namespace Raid.Toolkit.Model
                     ulong cachedClassRuntimeAddr = genericClassBinaryVA + slide + kCachedClassOffset;
                     ulong classPtr = runtime.ReadPointer(cachedClassRuntimeAddr);
 
+                    // Read class_inst (offset +8 from base) to verify which generic arg is actually stored
+                    ulong genericClassRuntimeBase = genericClassBinaryVA + slide;
+                    ulong classInstPtr = 0, typeArgvPtr = 0, firstArgTypePtr = 0;
+                    string firstArgName = "(err)";
+                    try
+                    {
+                        classInstPtr = runtime.ReadPointer(genericClassRuntimeBase + 8);
+                        if (classInstPtr != 0)
+                        {
+                            // Il2CppGenericInst: uint32 argc at +0, padding, Il2CppType** argv at +8
+                            typeArgvPtr = runtime.ReadPointer(classInstPtr + 8);
+                            if (typeArgvPtr != 0)
+                            {
+                                firstArgTypePtr = runtime.ReadPointer(typeArgvPtr);
+                                if (firstArgTypePtr != 0)
+                                {
+                                    // Il2CppType layout: ulong data at +0, uint16 attrs at +8, byte type at +10
+                                    // data for CLASS type contains klassIndex (low 32 bits) OR a pointer to Il2CppClass
+                                    // Read 8 bytes at +0 (data field) and 1 byte at +10 (type enum)
+                                    var typeBytes = runtime.ReadMemory(firstArgTypePtr, 12).ToArray();
+                                    ulong dataField = System.BitConverter.ToUInt64(typeBytes, 0);
+                                    byte typeEnum = typeBytes[10];
+                                    // Also: if the argType is CLASS (typeEnum=0x0A=10), dataField low 32 bits = klassIndex in metadata
+                                    // Then read classname from class at klassIndex
+                                    firstArgName = $"argTypePtr=0x{firstArgTypePtr:X},data=0x{dataField:X},typeEnum=0x{typeEnum:X}";
+
+                                    // For CLASS type (0x12): data is a pointer to Il2CppClass at runtime
+                                    // Try reading its name
+                                    if (typeEnum == 0x12 && dataField != 0)
+                                    {
+                                        try
+                                        {
+                                            ulong argNamePtr = runtime.ReadPointer(dataField + kClassNameOffset);
+                                            string argClassName = argNamePtr != 0 ? ReadProcessString(runtime, argNamePtr, 128) : "(null namePtr)";
+                                            firstArgName += $",argClass={argClassName}";
+                                        }
+                                        catch (Exception ex) { firstArgName += $",argClassErr={ex.Message}"; }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch { firstArgName = "(read failed)"; }
+
                     _logger?.LogWarning(
-                        "[BinaryTypeInfoProvider] GENERICINST {Name}: genericClassBinaryVA=0x{GVA:X}, slide=0x{Slide:X}, cachedClassAddr=0x{CCA:X}, classPtr=0x{CP:X}",
-                        name, genericClassBinaryVA, slide, cachedClassRuntimeAddr, classPtr);
+                        "[BinaryTypeInfoProvider] GENERICINST {Name}: genericClassBinaryVA=0x{GVA:X}, slide=0x{Slide:X}, cachedClassAddr=0x{CCA:X}, classPtr=0x{CP:X}, classInstPtr=0x{CI:X}, firstArg={FA}",
+                        name, genericClassBinaryVA, slide, cachedClassRuntimeAddr, classPtr, classInstPtr, firstArgName);
 
                     if (classPtr != 0)
                     {
@@ -184,7 +245,13 @@ namespace Raid.Toolkit.Model
                         {
                             ulong namePtr = runtime.ReadPointer(classPtr + kClassNameOffset);
                             string className = namePtr != 0 ? ReadProcessString(runtime, namePtr, 128) : "(null)";
-                            _logger?.LogWarning("[BinaryTypeInfoProvider] classPtr=0x{CP:X} name={ClassName}", classPtr, className);
+
+                            // Read generic_class field at +96 from the Il2CppClass* to verify which instantiation this is
+                            // generic_class* at +96: if non-null, its VA (minus slide) should match genericClassBinaryVA
+                            ulong genericClassRtPtr = runtime.ReadPointer(classPtr + 96);
+                            ulong genericClassVAFromClass = genericClassRtPtr != 0 ? (genericClassRtPtr - slide) : 0;
+                            _logger?.LogWarning("[BinaryTypeInfoProvider] classPtr=0x{CP:X} name={ClassName}, generic_class@+96=0x{GC:X} -> binaryVA=0x{BGVA:X} (expected 0x{ExpVA:X})",
+                                classPtr, className, genericClassRtPtr, genericClassVAFromClass, genericClassBinaryVA);
 
                             // Scan offsets near static_fields to diagnose wrong offset vs uninitialized
                             for (ulong scan = 152; scan <= 200; scan += 8)
@@ -261,6 +328,31 @@ namespace Raid.Toolkit.Model
                 _typeNameToTypeIndex = new Dictionary<string, (int, int)>(StringComparer.Ordinal);
                 BuildMapsV27Plus(il2cpp);
             }
+
+            _stringTypeInfo = BuildStringTypeInfo();
+        }
+
+        private Il2CppTypeInfo BuildStringTypeInfo()
+        {
+            var metadata = _typeModel!.Metadata;
+            for (int i = 0; i < metadata.typeDefs.Length; i++)
+            {
+                var td = metadata.typeDefs[i];
+                if (metadata.GetStringFromIndex(td.namespaceIndex) == "System" &&
+                    metadata.GetStringFromIndex(td.nameIndex) == "String")
+                {
+                    var info = new Il2CppTypeInfo
+                    {
+                        KlassId = new ClassId { Address = 0 },
+                        StaticFieldsAddress = 0
+                    };
+                    info.Fields.AddRange(BuildFields(td, i));
+                    _logger?.LogInformation("[BinaryTypeInfoProvider] System.String typedef found at index {I}, fields={N}", i, info.Fields.Count);
+                    return info;
+                }
+            }
+            _logger?.LogWarning("[BinaryTypeInfoProvider] System.String typedef not found in metadata");
+            return null;
         }
 
         private void BuildMapsV26(Metadata metadata, Il2Cpp il2cpp)
@@ -307,6 +399,31 @@ namespace Raid.Toolkit.Model
                     catch { continue; }
                     if (string.IsNullOrEmpty(name)) continue;
 
+                    // Log every SingleInstance<T> entry; also manually resolve the binary generic arg to cross-check TypeModel
+                    if (name.Contains("SingleInstance<") && il2cppType.type == Il2CppTypeEnum.IL2CPP_TYPE_GENERICINST)
+                    {
+                        string binaryArgName = "(err)";
+                        try
+                        {
+                            var genClass = il2cpp.MapVATR<Il2CppGenericClass>(il2cppType.data.generic_class);
+                            if (genClass.context.class_inst != 0)
+                            {
+                                var genInst = il2cpp.MapVATR<Il2CppGenericInst>(genClass.context.class_inst);
+                                if (genInst.type_argc > 0 && genInst.type_argv != 0)
+                                {
+                                    // type_argv is an array of ulong (binary VAs of Il2CppType*)
+                                    ulong firstArgVA = il2cpp.MapVATR<ulong>(genInst.type_argv);
+                                    var firstArgType = il2cpp.MapVATR<Il2CppType>(firstArgVA);
+                                    firstArgType.Init(_typeModel.Metadata.Version);
+                                    binaryArgName = _typeModel.GetTypeName(firstArgType, addNamespace: true, is_nested: false);
+                                }
+                            }
+                        }
+                        catch (Exception ex) { binaryArgName = $"err:{ex.Message}"; }
+                        _logger?.LogWarning("[BinaryTypeInfoProvider] BuildMapsV27Plus SingleInstance entry: i={I}, TypeModel={N}, binaryArg={BA}, generic_class_VA=0x{GVA:X}",
+                            i, name, binaryArgName, il2cppType.data.generic_class);
+                    }
+
                     _typeNameToTypeIndex[name] = (i, typeDefIndex);
                 }
                 catch { /* skip types that fail to process */ }
@@ -343,11 +460,24 @@ namespace Raid.Toolkit.Model
             throw new InvalidOperationException("GameAssembly.dll not found in target process modules");
         }
 
-        private IEnumerable<Il2CppField> BuildFields(Il2CppTypeDefinition typeDef)
+        private IEnumerable<Il2CppField> BuildFields(Il2CppTypeDefinition typeDef, int typeDefIndex)
         {
             var metadata = _typeModel!.Metadata;
             var il2cpp = _typeModel.Il2Cpp;
             var fields = new List<Il2CppField>(typeDef.field_count);
+
+            // For generic type definitions, the binary field offset table pointer is null.
+            // Detect this: FieldOffsetsArePointers && FieldOffsets[typeDefIndex] == 0.
+            // When true, compute offsets manually: reference-type fields are 8 bytes each,
+            // static fields start at 0, instance fields start at 16 (object header).
+            // For generic type definitions (genericContainerIndex >= 0), IL2CPP v27+ stores
+            // zeros for all field offsets even when the pointer is non-null. Compute manually.
+            bool hasBinaryOffsets = !il2cpp.FieldOffsetsArePointers
+                || (typeDefIndex < il2cpp.FieldOffsets.Length
+                    && il2cpp.FieldOffsets[typeDefIndex] != 0
+                    && typeDef.genericContainerIndex < 0);
+            ulong computedStaticOffset = 0;
+            ulong computedInstanceOffset = 16; // skip 16-byte object header
 
             for (int i = 0; i < typeDef.field_count; i++)
             {
@@ -356,8 +486,30 @@ namespace Raid.Toolkit.Model
                 string fieldName = metadata.GetStringFromIndex(fieldDef.nameIndex);
                 var fieldType = il2cpp.Types[fieldDef.typeIndex];
                 bool isStatic = ((FieldAttributes)fieldType.attrs).HasFlag(FieldAttributes.Static);
-                ulong offset = _typeModel.GetFieldOffsetFromIndex(typeDef, fieldDefIndex);
 
+                ulong offset;
+                if (hasBinaryOffsets)
+                {
+                    offset = _typeModel.GetFieldOffsetFromIndex(typeDef, fieldDefIndex);
+                }
+                else
+                {
+                    // No binary offsets for generic type definition: lay fields out sequentially.
+                    // All types treated as pointer-sized (8 bytes) — sufficient for reference types.
+                    if (isStatic)
+                    {
+                        offset = computedStaticOffset;
+                        computedStaticOffset += 8;
+                    }
+                    else
+                    {
+                        offset = computedInstanceOffset;
+                        computedInstanceOffset += 8;
+                    }
+                }
+
+                _logger?.LogWarning("[BinaryTypeInfoProvider] BuildFields field[{I}] name={Name} isStatic={S} offset={O} hasBinaryOffsets={H}",
+                    i, fieldName, isStatic, offset, hasBinaryOffsets);
                 fields.Add(new Il2CppField
                 {
                     Name = fieldName,

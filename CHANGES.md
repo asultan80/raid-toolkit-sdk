@@ -22,6 +22,12 @@
 * Fixed infinite hang in gRPC type/method calls — added 10-second deadline to all InjectionClient gRPC calls (Il2CppTypeCache, Il2CppTypeInfoLookup); without a deadline the calls block forever when the injection host inside RAID doesn't respond
 * Added binary metadata bypass (BinaryTypeInfoProvider) — when gRPC type resolution fails (RpcException/DeadlineExceeded), RTK now falls back to reading type/field info directly from GameAssembly.dll and global-metadata.dat; resolves class pointers via MetadataUsages slots with ASLR adjustment, reads static_fields pointer from Il2CppClass at runtime; accounts now load even when the injection host DLL is incompatible with the current game build
 * Fixed binary fallback failing for generic types (e.g. SingleInstance&lt;AppModel&gt;) — BuildMaps now iterates MetadataUsages entries using TypeModel.GetTypeName for canonical names (handles GENERICINST correctly); GetIl2CppTypeName now mirrors TypeModel's naming format (namespace only on outermost type, no namespace on generic args); fallback is tried before gRPC to avoid 10-second timeout per type
+* Fixed StaticFieldsAddress=0 being permanently cached when RTK connects before RAID initializes static fields — cache entry is evicted and retried on next poll
+* Fixed gRPC DeadlineExceeded on primitive/enum types (e.g. Int64, bool) — binary fallback or early return for IsPrimitive/IsEnum types skips unnecessary gRPC call
+* Fixed NullReferenceException in StringFactory — System.String type info now resolved from binary metadata (typedef scan) instead of falling back to gRPC
+* Fixed IOException in DbgLog on hot paths — File.AppendAllText now wrapped in try/catch to suppress file contention errors from concurrent threads
+* Fixed ArtifactExtension MissingMethodException — ExternalArtifactsStorage._state API removed in current game build; call moved to NoInlining method so MissingMethodException can be caught and fallback to non-migrated storage path used
+* Fixed Account extension compilation against game build 150352 — removed references to DestroyStatsParams.MaxDestructionPercentFormula and InitialState.DamageTaken which were removed from the game model
 
 ## 2.8.x
 

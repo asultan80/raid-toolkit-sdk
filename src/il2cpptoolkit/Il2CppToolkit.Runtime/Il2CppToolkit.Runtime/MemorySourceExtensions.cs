@@ -8,6 +8,13 @@ namespace Il2CppToolkit.Runtime;
 
 public static class MemorySourceExtensions
 {
+	private static readonly string s_dbgLog = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "rtk_debug.txt");
+	private static void DbgLog(string msg)
+	{
+		try { System.IO.File.AppendAllText(s_dbgLog, $"{DateTime.UtcNow:HH:mm:ss.fff} {msg}\n"); }
+		catch { /* suppress file contention in hot path */ }
+	}
+
 	private class ConvertPrimitive
 	{
 		public Func<IMemorySource, ulong, object> ReadFn;
@@ -204,6 +211,7 @@ public static class MemorySourceExtensions
 			type = LoadedTypes.GetType(unknownClass.ClassDefinition);
 			if (type == null)
 			{
+				DbgLog($"[ReadStruct] LoadedTypes.GetType returned null for classDef.FullName={unknownClass.ClassDefinition?.FullName} (expected type2={type2?.FullName})");
 				if (!(type2 == typeof(object)))
 				{
 					return null;

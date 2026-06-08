@@ -771,7 +771,6 @@ namespace Raid.Toolkit.DataModel
             return new DestroyStatsParams
             {
                 StatKindId = (StatKindId)type.StatKindId,
-                MaxDestructionPercentFormula = type.MaxDestructionPercentFormula,
             };
         }
 
@@ -1022,7 +1021,6 @@ namespace Raid.Toolkit.DataModel
 
             return new()
             {
-                DamageTaken = initialState.DamageTaken.AsDouble(),
                 HealthModifier = initialState.HealthModifier.AsDouble()
             };
         }

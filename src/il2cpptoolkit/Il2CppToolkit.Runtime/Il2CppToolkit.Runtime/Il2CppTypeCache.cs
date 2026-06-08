@@ -35,10 +35,27 @@ public class Il2CppTypeCache
 			if (runtime.FallbackTypeInfoProvider?.TryGetTypeInfo(runtime, mt, out Il2CppTypeInfo fallback) == true)
 				return fallback;
 
+			// When binary fallback is configured, gRPC is unavailable (injection host incompatible).
+			// Skip gRPC for: generated RAID types, primitives, and enums — their values are read
+			// directly without needing field offsets from GetTypeInfo. Return null so callers that
+			// ignore the result (e.g. GetValue's TValue warm-up call) fail fast.
+			if (runtime.FallbackTypeInfoProvider != null &&
+				(mt.GetCustomAttribute<GeneratedAttribute>() != null || mt.IsPrimitive || mt.IsEnum))
+				return null;
+
+			try { System.IO.File.AppendAllText(
+				System.IO.Path.Combine(System.IO.Path.GetTempPath(), "rtk_debug.txt"),
+				$"{DateTime.UtcNow:HH:mm:ss.fff} [TypeCache] gRPC fallback for non-generated type: {mt.FullName}\n"); } catch { }
+
 			return (classAddr == 0)
 				? runtime.InjectionClient.Il2Cpp.GetTypeInfo(new GetTypeInfoRequest { Klass = Il2CppTypeName.GetKlass(mt) }, (Metadata)null, DateTime.UtcNow.Add(kRpcDeadline), default(CancellationToken)).TypeInfo
 				: runtime.InjectionClient.Il2Cpp.GetTypeInfo(new GetTypeInfoRequest { Address = classAddr }, (Metadata)null, DateTime.UtcNow.Add(kRpcDeadline), default(CancellationToken)).TypeInfo;
 		});
+		// If StaticFieldsAddress=0 but the class pointer is known, RAID hasn't initialized the
+		// static fields block yet (happens when RTK connects before RAID finishes startup).
+		// Remove from cache so the next retry re-reads the live Il2CppClass.static_fields pointer.
+		if (result != null && result.StaticFieldsAddress == 0 && result.KlassId?.Address != 0)
+			typeCache.TypeInfoByType.TryRemove(managedType, out _);
 		if (result == null)
 		{
 			return false;

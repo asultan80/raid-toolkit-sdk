@@ -12,6 +12,13 @@ namespace Il2CppToolkit.Runtime;
 
 public class Il2CppTypeInfoLookup<TClass>
 {
+	private static readonly string s_dbgLog = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "rtk_debug.txt");
+	private static void DbgLog(string msg)
+	{
+		try { System.IO.File.AppendAllText(s_dbgLog, $"{DateTime.UtcNow:HH:mm:ss.fff} {msg}\n"); }
+		catch { /* suppress file contention in hot path */ }
+	}
+
 	public static TValue FromValue<TValue>(IRuntimeObject obj, Value returnValue)
 	{
 		//IL_0001: Unknown result type (might be due to invalid IL or missing references)
@@ -347,8 +354,21 @@ public class Il2CppTypeInfoLookup<TClass>
 	public static TValue GetStaticValue<TValue>(Il2CsRuntimeContext context, string name, byte indirection = 1)
 	{
 		Il2CppTypeInfo typeInfo = Il2CppTypeCache.GetTypeInfo(context, typeof(TClass), 0uL);
+		if (typeInfo == null)
+		{
+			DbgLog($"[GetStaticValue] typeInfo=null for {typeof(TClass).FullName}.{name}");
+			return default;
+		}
 		Il2CppField val = ((IEnumerable<Il2CppField>)typeInfo.Fields).First((Il2CppField fld) => fld.Name == name);
+		DbgLog($"[GetStaticValue] {typeof(TClass).FullName}.{name}: StaticFieldsAddress=0x{typeInfo.StaticFieldsAddress:X}, field.Offset={val.Offset}, readAddr=0x{typeInfo.StaticFieldsAddress + val.Offset:X}");
+		ulong readAddr = typeInfo.StaticFieldsAddress + val.Offset;
+		try {
+			ulong rawPtr = context.ReadPointer(readAddr);
+			DbgLog($"[GetStaticValue]   rawPtr at readAddr = 0x{rawPtr:X}");
+		} catch (Exception ex) { DbgLog($"[GetStaticValue]   readPointer failed: {ex.Message}"); }
 		Il2CppTypeCache.GetTypeInfo(context, typeof(TValue), val.KlassAddr);
-		return context.ReadValue<TValue>(typeInfo.StaticFieldsAddress + val.Offset, indirection);
+		var result = context.ReadValue<TValue>(typeInfo.StaticFieldsAddress + val.Offset, indirection);
+		DbgLog($"[GetStaticValue] {typeof(TClass).FullName}.{name} -> {(result == null ? "null" : "non-null")}");
+		return result;
 	}
 }
