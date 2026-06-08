@@ -28,6 +28,8 @@
 * Fixed IOException in DbgLog on hot paths — File.AppendAllText now wrapped in try/catch to suppress file contention errors from concurrent threads
 * Fixed ArtifactExtension MissingMethodException — ExternalArtifactsStorage._state API removed in current game build; call moved to NoInlining method so MissingMethodException can be caught and fallback to non-migrated storage path used
 * Fixed Account extension compilation against game build 150352 — removed references to DestroyStatsParams.MaxDestructionPercentFormula and InitialState.DamageTaken which were removed from the game model
+* Fixed gRPC DeadlineExceeded on Il2CppToolkit.Runtime wrapper types (e.g. Native__Dictionary<K,V>) — these construct via IRuntimeObject and don't need gRPC field offsets; now skipped alongside generated/primitive/enum types
+* Fixed StaticTypesExtension permanently skipping after first failure — HasWork=false is now only set once all static data files are confirmed written; previously a single gRPC timeout on startup locked out all static data (hero types, skills, artifacts, etc.) forever until RTK restart
 
 ## 2.8.x
 

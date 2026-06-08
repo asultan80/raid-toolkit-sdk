@@ -177,7 +177,10 @@ public class StaticTypesExtension :
             return new StaticSkillData() { SkillTypes = skillTypes };
         });
 
-        HasWork = false;
+        // Only stop polling once all static data files are present.
+        // If any EnsureTypesRead call failed (e.g. gRPC timeout), keep HasWork=true so we retry.
+        HasWork = !new[] { StringsKey, HeroTypesKey, ArtifactTypesKey, ArenaKey, AcademyKey, StagesKey, SkillTypesKey }
+            .All(key => Storage.TryRead<StaticDataBase>(key, out var d) && d != null);
         return Task.CompletedTask;
     }
 }

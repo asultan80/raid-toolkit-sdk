@@ -36,11 +36,13 @@ public class Il2CppTypeCache
 				return fallback;
 
 			// When binary fallback is configured, gRPC is unavailable (injection host incompatible).
-			// Skip gRPC for: generated RAID types, primitives, and enums — their values are read
-			// directly without needing field offsets from GetTypeInfo. Return null so callers that
-			// ignore the result (e.g. GetValue's TValue warm-up call) fail fast.
+			// Skip gRPC for: generated RAID types, primitives, enums, and Il2CppToolkit.Runtime
+			// wrapper types (e.g. Native__Dictionary<K,V>) — these construct via IRuntimeObject
+			// and don't need field offsets from GetTypeInfo. Return null so callers that ignore
+			// the result (e.g. warm-up calls in ReadStruct) fail fast without a 10-second wait.
 			if (runtime.FallbackTypeInfoProvider != null &&
-				(mt.GetCustomAttribute<GeneratedAttribute>() != null || mt.IsPrimitive || mt.IsEnum))
+				(mt.GetCustomAttribute<GeneratedAttribute>() != null || mt.IsPrimitive || mt.IsEnum ||
+				 mt.Assembly == typeof(Il2CppTypeCache).Assembly))
 				return null;
 
 			try { System.IO.File.AppendAllText(
