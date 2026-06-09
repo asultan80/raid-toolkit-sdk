@@ -287,14 +287,14 @@ namespace Raid.Toolkit.DataModel
         {
             return new HeroType()
             {
-                Affinity = (Enums.Element)type.Element,
+                Affinity = default,
                 Ascended = type.Id % 10,
                 Faction = (Enums.HeroFraction)type.Fraction,
                 Name = type.Name.ToModel(),
                 ShortName = type.ShortName?.ToModel() ?? type.Name.ToModel(),
                 Rarity = (Enums.HeroRarity)type.Rarity,
                 Role = type._allRoles?.Cast<Enums.HeroRole>().FirstOrDefault(),
-                LeaderSkill = type.LeaderSkill?.ToModel(),
+                LeaderSkill = null,
                 SkillTypeIds = type.AllSkillTypeIds?.ToArray(),
                 TypeId = type.Id,
                 Forms = type.Forms.Select(ToModel).ToArray()
@@ -538,7 +538,7 @@ namespace Raid.Toolkit.DataModel
             return new ChangeEffectLifetimeParams
             {
                 Type = (AppliedEffectType)type.Type,
-                Turns = type.Turns,
+                Turns = default,
                 Count = type.Count,
                 EffectTypeIds = type.EffectTypeIds?.Cast<StatusEffectTypeId>().ToList(),
             };

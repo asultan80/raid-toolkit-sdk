@@ -119,7 +119,7 @@ public class ArtifactExtension :
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static IReadOnlyList<Artifact> GetMigratedArtifacts(ModelScope scope)
     {
-        ExternalArtifactsStorage? storage = SharedModel.Meta.Artifacts.ArtifactStorage.ArtifactStorageResolver._implementation.GetValue(scope.Context) as ExternalArtifactsStorage;
-        return storage?._state._artifacts.Values.Select(ModelExtensions.ToModel).ToArray() ?? Array.Empty<Artifact>();
+        // ExternalArtifactsStorage._state removed in game build 150352; migrated path unavailable
+        return Array.Empty<Artifact>();
     }
 }

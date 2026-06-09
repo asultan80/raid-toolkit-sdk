@@ -21,15 +21,15 @@ namespace Raid.Toolkit.Extension.Account
         public bool ShouldIncrementalUpdate(SharedModel.Meta.Artifacts.UserArtifactData artifactData)
         {
             // Only refresh if m_nextRevisionId changed since last read, or after we've exceeded the forced read interval
-            return artifactData.NextArtifactId != m_nextId
-                || artifactData.NextArtifactRevisionId != m_nextRevisionId;
+            return artifactData.LastArtifactId != m_nextId
+                || artifactData.LastArtifactRevisionId != m_nextRevisionId;
         }
         public void MarkRefresh(SharedModel.Meta.Artifacts.UserArtifactData artifactData)
         {
             if (ShouldForceUpdate()) // if we're overtime
                 m_nextForcedRefresh = DateTime.UtcNow.AddMilliseconds(kForceRefreshInterval);
-            m_nextId = artifactData.NextArtifactId;
-            m_nextRevisionId = artifactData.NextArtifactRevisionId;
+            m_nextId = artifactData.LastArtifactId;
+            m_nextRevisionId = artifactData.LastArtifactRevisionId;
         }
     }
 }
