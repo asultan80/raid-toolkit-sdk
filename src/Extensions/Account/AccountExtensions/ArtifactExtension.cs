@@ -84,6 +84,18 @@ public class ArtifactExtension :
             }
         }
 
+        // Incorporate any artifacts from updatedArtifacts not already in result.
+        // This seeds the initial result when the base list is empty (e.g. _cachedArtifacts
+        // not yet built) and also captures genuinely new artifacts on incremental updates.
+        foreach (var kvp in updatedArtifacts)
+        {
+            if (!result.ContainsKey(kvp.Key) && !deletedArtifacts.Contains(kvp.Key))
+            {
+                result[kvp.Key] = kvp.Value.ToModel();
+                hasUpdates = true;
+            }
+        }
+
         if (hasUpdates)
         {
             Storage.Write(Key, result);
@@ -117,7 +129,7 @@ public class ArtifactExtension :
                     return migrated;
                 // migrated path returned empty — fall through to primary storage
             }
-            catch (MissingMethodException) { /* ExternalArtifactsStorage._state API changed; fall through */ }
+            catch (Exception) { /* migrated path failed (null pointer or API change); fall through */ }
         }
         return userWrapper.Artifacts.ArtifactData.Artifacts.Select(ModelExtensions.ToModel).ToList();
     }

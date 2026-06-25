@@ -37,6 +37,7 @@
 * Fixed StaticTypesExtension permanently skipping after first failure — HasWork=false is now only set once all static data files are confirmed written; previously a single gRPC timeout on startup locked out all static data (hero types, skills, artifacts, etc.) forever until RTK restart
 * Fixed StaticResources.AddStrings throwing ArgumentException on second call — dictionary used Add() which throws on duplicate keys when localization strings are re-added on each tick; changed to indexer assignment (dict[key] = value) which silently overwrites
 * Fixed HeroesExtension blocking on hero-types.static.json — hero-types require StaticHeroData via gRPC (CLASS type, no MetadataUsages entry) which always times out; HeroesExtension now proceeds with null heroType when static data unavailable; Hero.Name falls back to TypeId string
+* Fixed ArtifactExtension crash when _cachedArtifacts is null (RT2 at 0x0) — broadened catch from MissingMethodException to Exception so null-pointer RT2 is handled gracefully; also seeds result from UpdatedArtifacts so newly-arrived artifacts on incremental updates are captured; _cachedArtifacts is lazily populated by the game when the player opens their artifact inventory
 * Fixed artifacts always empty in game build 150352 — ExternalArtifactsStorage._state was removed but artifacts moved to _cachedArtifacts._artifacts (not back to ArtifactData.Artifacts as assumed); GetMigratedArtifacts now reads storage._cachedArtifacts._artifacts
 
 ## 2.8.x
