@@ -118,7 +118,7 @@ namespace Raid.Toolkit.DataModel
         public static Hero ToModel(
             this SharedModel.Meta.Heroes.Hero hero,
             Dictionary<ArtifactKindId, int> equippedArtifacts,
-            HeroType heroType)
+            HeroType? heroType)
         {
             Hero result = new()
             {
@@ -143,7 +143,7 @@ namespace Raid.Toolkit.DataModel
                 TotalMasteryScrolls = new Dictionary<string, int>(),
                 EquippedArtifactIds = equippedArtifacts.ToModel(),
                 Type = heroType,
-                Name = heroType.Name.Localize(),
+                Name = heroType?.Name?.Localize() ?? hero.TypeId.ToString(),
 #pragma warning disable 0618
                 SkillLevelsByTypeId = hero.Skills.ToDictionary(skill => skill.TypeId, skill => skill.Level),
 #pragma warning restore 0618

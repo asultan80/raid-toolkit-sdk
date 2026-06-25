@@ -32,7 +32,7 @@ namespace Raid.Toolkit.DataModel
         {
             foreach (var kvp in strings)
             {
-                LocalizedStrings.Add(kvp.Key, kvp.Value);
+                LocalizedStrings[kvp.Key] = kvp.Value;
             }
         }
 

@@ -31,14 +31,13 @@ public class HeroesExtension :
 
     protected override Task Update(ModelScope scope)
     {
-        if (!Account.TryGetApi<IGetAccountDataApi<StaticHeroTypeData>>(out var heroTypesApi)
-            || !heroTypesApi.TryGetData(out StaticHeroTypeData staticHeroTypes))
-            return Task.CompletedTask;
-
+        IReadOnlyDictionary<int, HeroType>? heroTypes = null;
+        if (Account.TryGetApi<IGetAccountDataApi<StaticHeroTypeData>>(out var heroTypesApi)
+            && heroTypesApi.TryGetData(out StaticHeroTypeData staticHeroTypes))
+            heroTypes = staticHeroTypes.HeroTypes;
 
         var userWrapper = scope.AppModel._userWrapper;
         var userHeroData = userWrapper.Heroes.HeroData;
-        var heroTypes = staticHeroTypes.HeroTypes;
 
         var artifactsByHeroId = scope.AppModel._userWrapper.Artifacts.ArtifactData.ArtifactDataByHeroId;
         var heroesById = userHeroData.HeroById;
@@ -54,7 +53,8 @@ public class HeroesExtension :
             var hero = kvp.Value;
             if (hero == null) continue;
 
-            var heroType = heroTypes[hero.TypeId];
+            HeroType? heroType = null;
+            heroTypes?.TryGetValue(hero.TypeId, out heroType);
             Dictionary<ArtifactKindId, int> equippedArtifacts = new();
             if (artifactsByHeroId.TryGetValue(id, out SharedModel.Meta.Artifacts.HeroArtifactData artifactData))
             {

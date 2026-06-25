@@ -110,7 +110,13 @@ public class ArtifactExtension :
         Client.Model.Guard.UserWrapper userWrapper = scope.AppModel._userWrapper;
         if (userWrapper.Artifacts.ArtifactData.StorageMigrationState == SharedModel.Meta.Artifacts.ArtifactStorage.ArtifactStorageMigrationState.Migrated)
         {
-            try { return GetMigratedArtifacts(scope); }
+            try
+            {
+                var migrated = GetMigratedArtifacts(scope);
+                if (migrated.Count > 0)
+                    return migrated;
+                // migrated path returned empty — fall through to primary storage
+            }
             catch (MissingMethodException) { /* ExternalArtifactsStorage._state API changed; fall through */ }
         }
         return userWrapper.Artifacts.ArtifactData.Artifacts.Select(ModelExtensions.ToModel).ToList();
@@ -119,7 +125,8 @@ public class ArtifactExtension :
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static IReadOnlyList<Artifact> GetMigratedArtifacts(ModelScope scope)
     {
-        // ExternalArtifactsStorage._state removed in game build 150352; migrated path unavailable
-        return Array.Empty<Artifact>();
+        // In game build 150352, _state was removed; artifacts now live in ExternalArtifactsStorage._cachedArtifacts._artifacts
+        ExternalArtifactsStorage? storage = SharedModel.Meta.Artifacts.ArtifactStorage.ArtifactStorageResolver._implementation.GetValue(scope.Context) as ExternalArtifactsStorage;
+        return storage?._cachedArtifacts._artifacts.Values.Select(ModelExtensions.ToModel).ToArray() ?? Array.Empty<Artifact>();
     }
 }
