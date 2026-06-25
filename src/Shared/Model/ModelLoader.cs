@@ -130,8 +130,7 @@ namespace Raid.Toolkit.Model
                 {
                     if (File.Exists(dllPath))
                     {
-                        FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(dllPath);
-                        Version onDiskVersion = new(fvi.FileMajorPart, fvi.FileMinorPart, fvi.FileBuildPart, fvi.FilePrivatePart);
+                        Version onDiskVersion = AssemblyName.GetAssemblyName(dllPath).Version;
                         if (onDiskVersion != CurrentInteropVersion)
                         {
                             shouldGenerate = true;

@@ -2,6 +2,9 @@
 
 ## 2.9.x
 
+* Fixed RTK startup hang — ModelLoader version check now reads .NET assembly version (AssemblyName.GetAssemblyName) instead of PE file version (FileVersionInfo); generated Interop DLLs embed only assembly version, causing FileVersionInfo to always return 0.0.0.0 and triggering a 30–60 minute rebuild on every launch
+* Fixed CS0433 build error — Raid.Interop.dll (game build 150352) embeds Newtonsoft.Json types including JObject, conflicting with Newtonsoft.Json package; resolved with extern alias RaidInterop in Extensibility.Host.csproj; removed dead using static RoutingTable from AccountReaderWriter.cs
+
 * Fixed LoadedTypes crash (ReflectionTypeLoadException) when Raid.Interop.dll contains types with unsatisfiable generic constraints or Newtonsoft.Json version mismatches — assembly.GetTypes() now catches ReflectionTypeLoadException and uses successfully-loaded types via ex.Types
 * Added diagnostic: scan Il2CppClass offsets 152–200 with non-zero values logged to find correct static_fields offset in v31; classPtr name verified from memory
 * Added diagnostic: GENERICINST resolution logs VA, slide, and computed runtime address at Warning level; ReadMemory errors include the failing address and handle value

@@ -1,3 +1,5 @@
+extern alias RaidInterop;
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -6,7 +8,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-using Client.Model;
+using AppModel = RaidInterop::Client.Model.AppModel;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -92,7 +94,7 @@ namespace Raid.Toolkit.Extensibility.Host
                 else
                 {
                     Logger.LogInformation("GameInstanceManager_OnAdded: reading game data for new instance {id}", e.Instance.Id);
-                    var appModel = Client.App.SingleInstance<AppModel>._instance.GetValue(e.Instance.Runtime);
+                    var appModel = RaidInterop::Client.App.SingleInstance<AppModel>._instance.GetValue(e.Instance.Runtime);
                     var userWrapper = appModel._userWrapper;
                     var accountData = userWrapper.Account.AccountData;
                     var gameSettings = userWrapper.UserGameSettings.GameSettings;

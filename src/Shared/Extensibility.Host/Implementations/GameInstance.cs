@@ -1,6 +1,8 @@
+extern alias RaidInterop;
+
 using System;
 using System.Diagnostics;
-using Client.Model;
+using AppModel = RaidInterop::Client.Model.AppModel;
 using Il2CppToolkit.Common.Errors;
 using Il2CppToolkit.Runtime;
 

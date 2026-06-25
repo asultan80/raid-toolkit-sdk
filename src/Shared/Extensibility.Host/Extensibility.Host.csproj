@@ -20,6 +20,7 @@
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.0" />
         <Reference Include="Raid.Interop">
             <HintPath>$(BinDir)$(TargetFrameworkVersion)\Raid.Interop.dll</HintPath>
+            <Aliases>RaidInterop</Aliases>
             <Private>False</Private>
             <SpecificVersion>False</SpecificVersion>
             <CopyLocal>False</CopyLocal>

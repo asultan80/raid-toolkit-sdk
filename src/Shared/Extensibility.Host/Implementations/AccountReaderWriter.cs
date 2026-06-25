@@ -10,7 +10,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-using static Client.ViewModel.Routing.RoutingTable;
 
 namespace Raid.Toolkit.Extensibility.Implementations
 {
