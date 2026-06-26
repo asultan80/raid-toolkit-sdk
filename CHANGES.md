@@ -1,6 +1,6 @@
 # Release Notes
 
-## 2.9.x
+## 3.0.x
 
 * Fixed RTK startup hang — ModelLoader version check now reads .NET assembly version (AssemblyName.GetAssemblyName) instead of PE file version (FileVersionInfo); generated Interop DLLs embed only assembly version, causing FileVersionInfo to always return 0.0.0.0 and triggering a 30–60 minute rebuild on every launch
 * Fixed CS0433 build error — Raid.Interop.dll (game build 150352) embeds Newtonsoft.Json types including JObject, conflicting with Newtonsoft.Json package; resolved with extern alias RaidInterop in Extensibility.Host.csproj; removed dead using static RoutingTable from AccountReaderWriter.cs
