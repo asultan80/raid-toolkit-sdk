@@ -11,6 +11,7 @@ namespace Raid.Toolkit.Extension.Account;
 
 public class StaticTypesExtension :
     AccountDataExtensionBase,
+    IAccountExportable,
     IAccountPublicApi<IGetAccountDataApi<StaticArtifactData>>,
     IGetAccountDataApi<StaticArtifactData>,
     IAccountPublicApi<IGetAccountDataApi<StaticHeroTypeData>>,
@@ -178,9 +179,30 @@ public class StaticTypesExtension :
         });
 
         // Only stop polling once all static data files are present.
+
         // If any EnsureTypesRead call failed (e.g. gRPC timeout), keep HasWork=true so we retry.
         HasWork = !new[] { StringsKey, HeroTypesKey, ArtifactTypesKey, ArenaKey, AcademyKey, StagesKey, SkillTypesKey }
             .All(key => Storage.TryRead<StaticDataBase>(key, out var d) && d != null);
         return Task.CompletedTask;
+    }
+
+    public void Export(IAccountReaderWriter account)
+    {
+        if (Storage.TryRead(HeroTypesKey, out StaticHeroTypeData heroTypes))
+            account.Write(HeroTypesKey, heroTypes);
+        if (Storage.TryRead(SkillTypesKey, out StaticSkillData skillTypes))
+            account.Write(SkillTypesKey, skillTypes);
+        if (Storage.TryRead(ArtifactTypesKey, out StaticArtifactData artifactTypes))
+            account.Write(ArtifactTypesKey, artifactTypes);
+    }
+
+    public void Import(IAccountReaderWriter account)
+    {
+        if (account.TryRead(HeroTypesKey, out StaticHeroTypeData? heroTypes))
+            Storage.Write(HeroTypesKey, heroTypes);
+        if (account.TryRead(SkillTypesKey, out StaticSkillData? skillTypes))
+            Storage.Write(SkillTypesKey, skillTypes);
+        if (account.TryRead(ArtifactTypesKey, out StaticArtifactData? artifactTypes))
+            Storage.Write(ArtifactTypesKey, artifactTypes);
     }
 }
