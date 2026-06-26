@@ -271,13 +271,128 @@ namespace Raid.Toolkit.Model
                     return classPtr;
                 }
 
-                // CLASS / VALUETYPE: no classPtr available in v27+ without MetadataUsages
-                _logger?.LogDebug("[BinaryTypeInfoProvider] v27+ CLASS/VALUETYPE {Name} ({T}): returning classPtr=0", name, il2cppType.type);
-                return 0;
+                // CLASS/VALUETYPE in v27+: no MetadataUsages to look up.
+                // Fall back: scan method binary code for RIP-relative TypeInfo global references.
+                return TryGetClassPtrFromMethodCode(runtime, (int)il2cppType.data.klassIndex, slide, name);
             }
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "[BinaryTypeInfoProvider] TryGetClassPtrV27 failed for {Name}", name);
+                return 0;
+            }
+        }
+
+        // Finds the Il2CppClass* for a CLASS/VALUETYPE type in v27+ by scanning the first method's
+        // binary code for RIP-relative references to the global TypeInfo pointer that the generated
+        // IL2CPP code uses to access the class object. Each IL2CPP method that uses a concrete type
+        // starts with LEA/MOV instructions of the form [REX] 8B/8D [RIP+disp32] that point to the
+        // global `TypeName__TypeInfo` variable stored in the binary's .data/.bss section.
+        private ulong TryGetClassPtrFromMethodCode(Il2CsRuntimeContext runtime, int typeDefIndex, ulong slide, string name)
+        {
+            try
+            {
+                var metadata = _typeModel!.Metadata;
+                var il2cpp = _typeModel.Il2Cpp;
+                var typeDef = metadata.typeDefs[typeDefIndex];
+
+                // Find which image (module) contains this type definition
+                string imageName = null;
+                for (int i = 0; i < metadata.imageDefs.Length; i++)
+                {
+                    var img = metadata.imageDefs[i];
+                    if (typeDefIndex >= img.typeStart && typeDefIndex < img.typeStart + img.typeCount)
+                    {
+                        imageName = metadata.GetStringFromIndex(img.nameIndex);
+                        break;
+                    }
+                }
+                if (imageName == null || !il2cpp.CodeGenModuleMethodPointers.ContainsKey(imageName))
+                {
+                    _logger?.LogWarning("[BinaryTypeInfoProvider] MethodCode: no module for {N} (image={I})", name, imageName ?? "null");
+                    return 0;
+                }
+
+                // Find first method of the type with a non-zero binary VA
+                ulong methodBinaryVA = 0;
+                string methodName = null;
+                for (int m = 0; m < typeDef.method_count && methodBinaryVA == 0; m++)
+                {
+                    var methodDef = metadata.methodDefs[typeDef.methodStart + m];
+                    ulong va = il2cpp.GetMethodPointer(imageName, methodDef);
+                    if (va != 0)
+                    {
+                        methodBinaryVA = va;
+                        methodName = metadata.GetStringFromIndex(methodDef.nameIndex);
+                    }
+                }
+                if (methodBinaryVA == 0)
+                {
+                    _logger?.LogWarning("[BinaryTypeInfoProvider] MethodCode: no method pointer for {N}", name);
+                    return 0;
+                }
+                _logger?.LogWarning("[BinaryTypeInfoProvider] MethodCode: scanning {N}.{M} @ binary 0x{VA:X}", name, methodName, methodBinaryVA);
+
+                // Read 256 bytes of method code from the binary file
+                byte[] code;
+                try
+                {
+                    il2cpp.Position = il2cpp.MapVATR(methodBinaryVA);
+                    code = il2cpp.ReadBytes(256);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning("[BinaryTypeInfoProvider] MethodCode: binary read failed for {N}: {E}", name, ex.Message);
+                    return 0;
+                }
+
+                // Scan for x64 RIP-relative memory references: [REX] OP modrm[mod=00,rm=101] disp32
+                // Instruction encoding (7 bytes total):
+                //   byte 0: REX prefix (0x40–0x4F)
+                //   byte 1: opcode (0x8B=MOV or 0x8D=LEA)
+                //   byte 2: ModRM with mod=00 (bits 7:6), rm=101 (bits 2:0) → mask 0xC7 == 0x05
+                //   bytes 3–6: 32-bit signed displacement
+                // refBinaryVA = (methodBinaryVA + instrOffset + 7) + disp32
+                string shortName = name.Contains('.') ? name.Split('.')[^1] : name;
+                for (int off = 0; off <= 249; off++)
+                {
+                    byte b0 = code[off];
+                    if (b0 < 0x40 || b0 > 0x4F) continue;
+                    byte b1 = code[off + 1];
+                    if (b1 != 0x8B && b1 != 0x8D) continue;
+                    byte modrm = code[off + 2];
+                    if ((modrm & 0xC7) != 0x05) continue;
+
+                    int disp32 = BitConverter.ToInt32(code, off + 3);
+                    ulong nextInstrBinaryVA = methodBinaryVA + (ulong)off + 7;
+                    ulong refBinaryVA = (ulong)((long)nextInstrBinaryVA + disp32);
+                    ulong refRuntimeAddr = refBinaryVA + slide;
+
+                    try
+                    {
+                        ulong classPtr = runtime.ReadPointer(refRuntimeAddr);
+                        if (classPtr == 0) continue;
+
+                        // Validate: read the class name from the Il2CppClass* object
+                        ulong namePtr = runtime.ReadPointer(classPtr + kClassNameOffset);
+                        if (namePtr == 0) continue;
+                        string className = ReadProcessString(runtime, namePtr, 64);
+                        if (className == null) continue;
+
+                        _logger?.LogWarning("[BinaryTypeInfoProvider] MethodCode {N}: code+{Off}=0x{Op:X2}{Mod:X2}, refBinaryVA=0x{RVA:X}, classPtr=0x{CP:X}, className={CN}",
+                            name, off, b1, modrm, refBinaryVA, classPtr, className);
+
+                        if (string.Equals(className, shortName, StringComparison.Ordinal))
+                            return classPtr;
+                    }
+                    catch { continue; }
+                }
+
+                _logger?.LogWarning("[BinaryTypeInfoProvider] MethodCode: no TypeInfo ref found for {N} in method {M}", name, methodName);
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning("[BinaryTypeInfoProvider] TryGetClassPtrFromMethodCode failed for {N}: {E}", name, ex.Message);
                 return 0;
             }
         }

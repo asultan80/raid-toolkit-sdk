@@ -11,6 +11,9 @@ public abstract class Il2Cpp : BinaryStream
 
 	private Il2CppCodeRegistration m_codeRegistration;
 
+	// Binary VA of Il2CppMetadataRegistration — used to read runtime class pointers for v27+ CLASS types
+	public ulong MetadataRegistrationVA { get; private set; }
+
 	private Il2CppGenericMethodFunctionsDefinitions[] m_genericMethodTable;
 
 	public Il2CppTypeDefinitionSizes[] TypeDefinitionSizes;
@@ -142,6 +145,7 @@ public abstract class Il2Cpp : BinaryStream
 
 	public virtual void Init(ulong codeRegistration, ulong metadataRegistration)
 	{
+		MetadataRegistrationVA = metadataRegistration;
 		m_codeRegistration = MapVATR<Il2CppCodeRegistration>(codeRegistration);
 		uint limit = ((this is WebAssemblyMemory) ? 217088u : 327680u);
 		if (Version == 27.0 && m_codeRegistration.invokerPointersCount > limit)

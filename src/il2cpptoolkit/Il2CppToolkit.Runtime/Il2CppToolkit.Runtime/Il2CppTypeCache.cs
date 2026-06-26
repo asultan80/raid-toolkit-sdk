@@ -36,18 +36,15 @@ public class Il2CppTypeCache
 				return fallback;
 
 			// When binary fallback is configured, gRPC is unavailable (injection host incompatible).
-			// Skip gRPC for: generated RAID types, primitives, enums, and Il2CppToolkit.Runtime
-			// wrapper types (e.g. Native__Dictionary<K,V>) — these construct via IRuntimeObject
-			// and don't need field offsets from GetTypeInfo. Return null so callers that ignore
-			// the result (e.g. warm-up calls in ReadStruct) fail fast without a 10-second wait.
+			// Skip gRPC for: generated RAID types, primitives, enums, Il2CppToolkit.Runtime
+			// wrapper types (e.g. Native__Dictionary<K,V>), and Nullable<T> — these either
+			// construct via IRuntimeObject or are read directly from memory without needing
+			// field offsets from GetTypeInfo. Return null so callers fail fast without a 10s wait.
 			if (runtime.FallbackTypeInfoProvider != null &&
 				(mt.GetCustomAttribute<GeneratedAttribute>() != null || mt.IsPrimitive || mt.IsEnum ||
-				 mt.Assembly == typeof(Il2CppTypeCache).Assembly))
+				 mt.Assembly == typeof(Il2CppTypeCache).Assembly ||
+				 (mt.IsGenericType && mt.GetGenericTypeDefinition() == typeof(Nullable<>))))
 				return null;
-
-			try { System.IO.File.AppendAllText(
-				System.IO.Path.Combine(System.IO.Path.GetTempPath(), "rtk_debug.txt"),
-				$"{DateTime.UtcNow:HH:mm:ss.fff} [TypeCache] gRPC fallback for non-generated type: {mt.FullName}\n"); } catch { }
 
 			return (classAddr == 0)
 				? runtime.InjectionClient.Il2Cpp.GetTypeInfo(new GetTypeInfoRequest { Klass = Il2CppTypeName.GetKlass(mt) }, (Metadata)null, DateTime.UtcNow.Add(kRpcDeadline), default(CancellationToken)).TypeInfo

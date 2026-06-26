@@ -207,8 +207,8 @@ namespace Raid.Toolkit.DataModel
                 Faction = artifact._requiredFraction.ToString(),
                 FailedUpgrades = artifact._failedUpgrades,
                 Revision = artifact._revision,
-                PrimaryBonus = artifact._primaryBonus.ToModel(),
-                SecondaryBonuses = artifact._secondaryBonuses.Select(bonus => bonus.ToModel()).ToList()
+                PrimaryBonus = artifact._primaryBonus?.ToModel(),
+                SecondaryBonuses = artifact._secondaryBonuses?.Where(b => b != null).Select(bonus => bonus.ToModel()).ToList() ?? new()
             };
         }
 
@@ -217,8 +217,8 @@ namespace Raid.Toolkit.DataModel
             return new()
             {
                 KindId = bonus._kindId.ToModel(),
-                Absolute = bonus._value._isAbsolute,
-                Value = bonus._value._value.AsDouble(),
+                Absolute = bonus._value?._isAbsolute ?? false,
+                Value = (bonus._value?._value).AsDouble() ?? 0.0,
                 GlyphPower = bonus._powerUpValue.AsDouble(),
                 Level = bonus._level
             };

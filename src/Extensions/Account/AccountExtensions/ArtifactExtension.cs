@@ -117,28 +117,32 @@ public class ArtifactExtension :
             Storage.Write(Key, data);
     }
 
-    private static IReadOnlyList<Artifact> GetArtifacts(ModelScope scope)
+    private IReadOnlyList<Artifact> GetArtifacts(ModelScope scope)
     {
         Client.Model.Guard.UserWrapper userWrapper = scope.AppModel._userWrapper;
-        if (userWrapper.Artifacts.ArtifactData.StorageMigrationState == SharedModel.Meta.Artifacts.ArtifactStorage.ArtifactStorageMigrationState.Migrated)
+        var migrationState = userWrapper.Artifacts.ArtifactData.StorageMigrationState;
+        if (migrationState == SharedModel.Meta.Artifacts.ArtifactStorage.ArtifactStorageMigrationState.Migrated)
         {
             try
             {
                 var migrated = GetMigratedArtifacts(scope);
                 if (migrated.Count > 0)
                     return migrated;
-                // migrated path returned empty — fall through to primary storage
             }
-            catch (Exception) { /* migrated path failed (null pointer or API change); fall through */ }
+            catch (Exception ex) { Logger.LogWarning($"Artifact migrated path exception: {ex.GetType().Name}: {ex.Message}"); }
         }
-        return userWrapper.Artifacts.ArtifactData.Artifacts.Select(ModelExtensions.ToModel).ToList();
+        var direct = userWrapper.Artifacts.ArtifactData.Artifacts;
+        return direct?.Select(ModelExtensions.ToModel).ToList() ?? new List<Artifact>();
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static IReadOnlyList<Artifact> GetMigratedArtifacts(ModelScope scope)
+    private IReadOnlyList<Artifact> GetMigratedArtifacts(ModelScope scope)
     {
-        // In game build 150352, _state was removed; artifacts now live in ExternalArtifactsStorage._cachedArtifacts._artifacts
+        // In game build 150352, artifacts moved from ArtifactData to ExternalArtifactsStorage._cachedArtifacts._artifacts
         ExternalArtifactsStorage? storage = SharedModel.Meta.Artifacts.ArtifactStorage.ArtifactStorageResolver._implementation.GetValue(scope.Context) as ExternalArtifactsStorage;
-        return storage?._cachedArtifacts._artifacts.Values.Select(ModelExtensions.ToModel).ToArray() ?? Array.Empty<Artifact>();
+        var cached = storage?._cachedArtifacts;
+        if (cached == null) return Array.Empty<Artifact>();
+        var dict = cached._artifacts;
+        return dict?.Values.Where(a => a != null).Select(ModelExtensions.ToModel).ToArray() ?? Array.Empty<Artifact>();
     }
 }
