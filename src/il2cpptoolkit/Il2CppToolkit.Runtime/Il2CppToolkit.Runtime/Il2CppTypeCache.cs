@@ -43,6 +43,8 @@ public class Il2CppTypeCache
 			if (runtime.FallbackTypeInfoProvider != null &&
 				(mt.GetCustomAttribute<GeneratedAttribute>() != null || mt.IsPrimitive || mt.IsEnum ||
 				 mt.Assembly == typeof(Il2CppTypeCache).Assembly ||
+				 typeof(IRuntimeObject).IsAssignableFrom(mt) ||
+				 mt.IsArray ||
 				 (mt.IsGenericType && mt.GetGenericTypeDefinition() == typeof(Nullable<>))))
 				return null;
 

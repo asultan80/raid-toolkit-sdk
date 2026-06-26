@@ -295,7 +295,7 @@ namespace Raid.Toolkit.DataModel
                 Rarity = (Enums.HeroRarity)type.Rarity,
                 Role = type._allRoles?.Cast<Enums.HeroRole>().FirstOrDefault(),
                 LeaderSkill = null,
-                SkillTypeIds = type.AllSkillTypeIds?.ToArray(),
+                SkillTypeIds = null, // AllSkillTypeIds() is a computed IL2CPP getter — requires gRPC CallMethod (unavailable without compatible injection host)
                 TypeId = type.Id,
                 Forms = type.Forms.Select(ToModel).ToArray()
             };
