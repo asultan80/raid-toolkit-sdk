@@ -917,7 +917,7 @@ namespace Raid.Toolkit.DataModel
                 ActivateSkillParams = type.ActivateSkillParams?.ToModel(),
                 ApplyStatusEffectParams = type.ApplyStatusEffectParams?.ToModel(),
 
-                IsContainer = type.IsContainer,
+                IsContainer = false, // computed IL2CPP getter — unavailable under binary fallback
                 ApplyInstantEffectMode = (ApplyMode?)type.ApplyInstantEffectMode,
                 PersistsThroughRounds = type.PersistsThroughRounds,
                 SnapshotRequired = type.SnapshotRequired,
